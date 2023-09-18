@@ -17,10 +17,10 @@ def response_message(message: str or list):
         return response
 
     if p_message[0] == '!p':
-        return "Now playing!"
+        return "Now playing! "
 
     if p_message[0] == '!n':
-        pass
+        return "Next song is: "
 
     if p_message[0] == '!wq':
         pass
