@@ -1,5 +1,6 @@
 import discord
 import responses
+from discord.ext import commands
 
 
 async def send_message(message, user_message, is_private):
@@ -12,8 +13,9 @@ async def send_message(message, user_message, is_private):
 
 def run_discord_bot():
     intents = discord.Intents.default()
-    token = 'NjkwOTkyNjM4NjM5MzQxNjI5.GHBDfO.WNUBWzpSzy5nF73LqeZDVWp9Qwz0nEyci0H-WE'
-    client = discord.Client(intents=intents)
+    intents.message_content = True
+    token = 'NjkwOTkyNjM4NjM5MzQxNjI5.GXNezh.MBI7BhO6auPjtbwYq6orlA07voB73Ar4MMGdv8'
+    client = commands.Bot(command_prefix='!', intents=intents)
 
     @client.event
     async def on_ready():
@@ -22,6 +24,8 @@ def run_discord_bot():
     @client.event
     async def on_message(message):
         if message.author == client.user:
+            return
+        if message.author.bot:
             return
 
         username = str(message.author)
@@ -34,5 +38,29 @@ def run_discord_bot():
             await send_message(message, user_message, is_private=True)
         else:
             await send_message(message, user_message, is_private=False)
+            if responses.response_message(user_message) == 'Now playing! ':
+                print(message)
+
+    @client.command()
+    async def join(ctx):
+        # Check if the user is in a voice channel
+        if ctx.author.voice is None:
+            await ctx.send("You are not in a voice channel.")
+            return
+
+        # Connect to the user's voice channel
+        channel = ctx.author.voice.channel
+        await channel.connect()
+        await ctx.send(f"Joined {channel.name}")
+
+    @client.command()
+    async def leave(ctx):
+        voice_client = ctx.guild.voice_client
+
+        if voice_client:
+            await voice_client.disconnect()
+            await ctx.send("Left the voice channel.")
+        else:
+            await ctx.send("I'm not in a voice channel.")
 
     client.run(token)
