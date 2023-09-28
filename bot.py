@@ -1,6 +1,7 @@
 import discord
 import responses
 from discord.ext import commands
+import youtube_dl
 
 
 async def send_message(message, user_message, is_private):
@@ -16,6 +17,24 @@ def run_discord_bot():
     intents.message_content = True
     token = 'NjkwOTkyNjM4NjM5MzQxNjI5.GXNezh.MBI7BhO6auPjtbwYq6orlA07voB73Ar4MMGdv8'
     client = commands.Bot(command_prefix='!', intents=intents)
+
+    @client.command()
+    async def play(ctx, url):
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }],
+        }
+
+        with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+            url2 = info['formats'][0]['url']
+            voice_client = ctx.voice_client
+            voice_client.stop()
+            voice_client.play(discord.FFmpegPCMAudio(url2))
 
     @client.event
     async def on_ready():
