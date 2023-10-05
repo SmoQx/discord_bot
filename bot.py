@@ -1,7 +1,7 @@
 import discord
 import responses
 from discord.ext import commands
-import youtube_dl
+import yt_dlp as yt
 
 
 async def send_message(message, user_message, is_private):
@@ -20,6 +20,13 @@ def run_discord_bot():
 
     @client.command()
     async def play(ctx, url):
+        channel = ctx.author.voice.channel
+
+        if ctx.voice_client is None:
+            await channel.connect()
+        else:
+            print("already connected")
+
         ydl_opts = {
             'format': 'bestaudio/best',
             'postprocessors': [{
@@ -29,14 +36,19 @@ def run_discord_bot():
             }],
         }
 
-        with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+        with yt.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
-            url2 = info['formats'][0]['url']
+            url2 = info['url']
             voice_client = ctx.voice_client
             voice_client.stop()
             voice_client.play(discord.FFmpegPCMAudio(url2))
 
-    @client.event
+    @client.command()
+    async def stop(ctx):
+        voice_client = ctx.voice_client
+        voice_client.stop()
+
+    """@client.event
     async def on_ready():
         print(f'{client.user} is now running!')
 
@@ -58,7 +70,7 @@ def run_discord_bot():
         else:
             await send_message(message, user_message, is_private=False)
             if responses.response_message(user_message) == 'Now playing! ':
-                print(message)
+                print(message)"""
 
     @client.command()
     async def join(ctx):
