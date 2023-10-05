@@ -57,7 +57,7 @@ def run_discord_bot():
                 voice_client = ctx.voice_client
                 voice_client.stop()
                 voice_client.play(discord.FFmpegPCMAudio(url2))
-            await ctx.send(f"Now playing: {info['title']}")
+            await ctx.send(f"Now playing: {info['title']}.")
 
     @client.command()
     async def skip(ctx):
