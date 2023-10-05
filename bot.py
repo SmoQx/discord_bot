@@ -40,6 +40,15 @@ def run_discord_bot():
         await ctx.send(f"Available commands:\n```\n{command_list_str}\n```")
 
     @client.command()
+    async def queue(ctx):
+        title = ''
+        for url in play_queue:
+            with yt.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+                title = title + '\n' + info['title']
+        await ctx.send(f'Songs in q: \n {title}')
+
+    @client.command()
     async def play(ctx, url):
         play_queue.append(url)
         channel = ctx.author.voice.channel
