@@ -17,9 +17,31 @@ def run_discord_bot():
     intents.message_content = True
     token = 'NjkwOTkyNjM4NjM5MzQxNjI5.GXNezh.MBI7BhO6auPjtbwYq6orlA07voB73Ar4MMGdv8'
     client = commands.Bot(command_prefix='!', intents=intents)
+    play_queue = []
+
+    ydl_opts = {
+        'format': 'bestaudio/best',
+        'postprocessors': [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'mp3',
+            'preferredquality': '192',
+        }],
+    }
+
+    @client.command()
+    async def list_commands(ctx):
+        # Get the list of all registered commands
+        command_list = list(client.all_commands.keys())
+
+        # Format the list into a string
+        command_list_str = "\n".join(command_list)
+
+        # Send the list of commands as a message
+        await ctx.send(f"Available commands:\n```\n{command_list_str}\n```")
 
     @client.command()
     async def play(ctx, url):
+        play_queue.append(url)
         channel = ctx.author.voice.channel
 
         if ctx.voice_client is None:
@@ -27,21 +49,35 @@ def run_discord_bot():
         else:
             print("already connected")
 
-        ydl_opts = {
-            'format': 'bestaudio/best',
-            'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '192',
-            }],
-        }
+        if not ctx.voice_client.is_playing():
+            song = play_queue.pop(0)
+            with yt.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(song, download=False)
+                url2 = info['url']
+                voice_client = ctx.voice_client
+                voice_client.stop()
+                voice_client.play(discord.FFmpegPCMAudio(url2))
+            await ctx.send(f"Now playing: {info['title']}")
+
+    @client.command()
+    async def skip(ctx):
+        # Check if there are songs in the queue
+        voice_client = ctx.voice_client
+        if not play_queue:
+            await ctx.send("The play queue is empty.")
+            voice_client.stop()
+            return
+
+        # Get the next song URL from the queue
+        next_song = play_queue.pop(0)
 
         with yt.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=False)
+            info = ydl.extract_info(next_song, download=False)
             url2 = info['url']
-            voice_client = ctx.voice_client
             voice_client.stop()
             voice_client.play(discord.FFmpegPCMAudio(url2))
+
+        await ctx.send(f"Now playing: {info['title']}")
 
     @client.command()
     async def stop(ctx):
