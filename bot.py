@@ -5,6 +5,7 @@ import yt_dlp as yt
 import asyncio
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
+from urllib.parse import urlparse
 
 
 async def send_message(message, user_message, is_private):
@@ -13,6 +14,14 @@ async def send_message(message, user_message, is_private):
         await message.author.send(response) if is_private else await message.channel.send(response)
     except Exception as e:
         print(e)
+
+
+def is_valid_url(url):
+    try:
+        result = urlparse(url)
+        return all([result.scheme, result.netloc])
+    except ValueError:
+        return False
 
 
 def run_discord_bot():
@@ -91,6 +100,11 @@ def run_discord_bot():
             await channel.connect()
         else:
             print("already connected")
+
+        if is_valid_url(url):
+            print(f"IS VALID URL{url}")
+        else:
+            await ctx.send("Its not an URL")
 
         if not ctx.voice_client.is_playing():
             await play_next(ctx)
