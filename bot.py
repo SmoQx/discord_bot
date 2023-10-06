@@ -2,6 +2,7 @@ import discord
 import responses
 from discord.ext import commands
 import yt_dlp as yt
+import asyncio
 
 
 async def send_message(message, user_message, is_private):
@@ -27,6 +28,31 @@ def run_discord_bot():
             'preferredquality': '192',
         }],
     }
+
+    async def play_next(ctx):
+        if not play_queue:
+            return
+
+        vc = ctx.voice_client
+        if vc.is_playing():
+            return
+
+        try:
+            with yt.YoutubeDL(ydl_opts) as ydl:
+                song = play_queue.pop(0)
+                info = ydl.extract_info(song, download=False)
+                url2 = info['url']
+                voice_client = ctx.voice_client
+
+                def after_playing(e):
+                    # This function is called when the song has finished playing
+                    asyncio.run_coroutine_threadsafe(play_next(ctx), client.loop)
+
+                voice_client.stop()
+                voice_client.play(discord.FFmpegPCMAudio(url2), after=after_playing)
+        except Exception as exception_:
+            print(exception_)
+        await ctx.send(f"Now playing: {info['title']}.")
 
     @client.command()
     async def list_commands(ctx):
@@ -59,14 +85,11 @@ def run_discord_bot():
             print("already connected")
 
         if not ctx.voice_client.is_playing():
-            song = play_queue.pop(0)
+            await play_next(ctx)
+        else:
             with yt.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(song, download=False)
-                url2 = info['url']
-                voice_client = ctx.voice_client
-                voice_client.stop()
-                voice_client.play(discord.FFmpegPCMAudio(url2))
-            await ctx.send(f"Now playing: {info['title']}.")
+                info = ydl.extract_info(url, download=False)
+            await ctx.send(f"Added to q: {info['title']}.")
 
     @client.command()
     async def skip(ctx):
