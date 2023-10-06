@@ -3,6 +3,8 @@ import responses
 from discord.ext import commands
 import yt_dlp as yt
 import asyncio
+import spotipy
+from spotipy.oauth2 import SpotifyOAuth
 
 
 async def send_message(message, user_message, is_private):
@@ -28,6 +30,12 @@ def run_discord_bot():
             'preferredquality': '192',
         }],
     }
+
+    # Initialize the Spotify API client
+    sp = spotipy.Spotify(auth_manager=SpotifyOAuth(client_id='YOUR_SPOTIFY_CLIENT_ID',
+                                                   client_secret='YOUR_SPOTIFY_CLIENT_SECRET',
+                                                   redirect_uri='YOUR_REDIRECT_URI',
+                                                   scope='user-library-read user-read-playback-state user-modify-playback-state'))
 
     async def play_next(ctx):
         if not play_queue:
@@ -116,10 +124,10 @@ def run_discord_bot():
         voice_client = ctx.voice_client
         voice_client.stop()
 
-    """@client.event
+    @client.event
     async def on_ready():
         print(f'{client.user} is now running!')
-
+    """
     @client.event
     async def on_message(message):
         if message.author == client.user:
@@ -161,5 +169,22 @@ def run_discord_bot():
             await ctx.send("Left the voice channel.")
         else:
             await ctx.send("I'm not in a voice channel.")
+
+    @client.command()
+    async def splay(ctx, query):
+        # Search for a track on Spotify
+        results = sp.search(q=query, limit=1, type='track')
+
+        if results['tracks']['items']:
+            track_uri = results['tracks']['items'][0]['uri']
+
+            # Join the voice channel
+            channel = ctx.author.voice.channel
+            vc = await channel.connect()
+
+            # Play the Spotify track
+            vc.play(discord.FFmpegPCMAudio(track_uri))
+        else:
+            await ctx.send("Track not found.")
 
     client.run(token)
