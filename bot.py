@@ -24,6 +24,24 @@ def is_valid_url(url):
         return False
 
 
+def search_youtube_videos(query):
+    ydl_opts = {
+        'format': 'best',  # You can adjust the format as needed
+        'extract_flat': True,  # Extract only flat results (videos)
+        'quiet': True,  # Suppress yt-dlp output
+    }
+
+    with yt.YoutubeDL(ydl_opts) as ydl:
+        search_results = ydl.extract_info(f'ytsearch:{query}', download=False)
+
+        # Check if 'entries' key exists in the result (videos found)
+        if 'entries' in search_results:
+            videos = search_results['entries']
+            return videos
+        else:
+            return []
+
+
 def run_discord_bot():
     intents = discord.Intents.default()
     intents.message_content = True
@@ -92,8 +110,7 @@ def run_discord_bot():
         await ctx.send(f'Songs in q: \n {title}')
 
     @client.command()
-    async def play(ctx, url):
-        play_queue.append(url)
+    async def play(ctx, *url):
         channel = ctx.author.voice.channel
 
         if ctx.voice_client is None:
@@ -101,17 +118,31 @@ def run_discord_bot():
         else:
             print("already connected")
 
-        if is_valid_url(url):
-            print(f"IS VALID URL{url}")
+        if is_valid_url(url[0]):
+            play_queue.append(url[0])
+            print(f"IS VALID URL{url[0]}")
+            if not ctx.voice_client.is_playing():
+                await play_next(ctx)
+            else:
+                with yt.YoutubeDL(ydl_opts) as ydl:
+                    info = ydl.extract_info(url[0], download=False)
+                await ctx.send(f"Added to q: {info['title']}.")
         else:
             await ctx.send("Its not an URL")
+            # Example usage:
+            for string in url:
+                print(string)
+            query = url
+            videos = search_youtube_videos(query)
 
-        if not ctx.voice_client.is_playing():
-            await play_next(ctx)
-        else:
-            with yt.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=False)
-            await ctx.send(f"Added to q: {info['title']}.")
+            if videos:
+                for video in videos:
+                    print(f"Video Title: {video['title']}")
+                    print(f"Video URL: https://www.youtube.com/watch?v={video['id']}")
+                    play_queue.append(f"https://www.youtube.com/watch?v={video['id']}")
+                    await play_next(ctx)
+            else:
+                print("No videos found for the given query.")
 
     @client.command()
     async def skip(ctx):
