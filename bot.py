@@ -63,12 +63,6 @@ def run_discord_bot():
         }],
     }
 
-    # Initialize the Spotify API client
-    sp = spotipy.Spotify(auth_manager=SpotifyOAuth(client_id='fbe4ddd2b0944d8caadd82fc3a634ba6',
-                                                   client_secret='937f97778b604fa8a3367d81979d23c8',
-                                                   redirect_uri='http://127.0.0.1:8888/callback',
-                                                   scope='user-library-read user-read-playback-state user-modify-playback-state'))
-
     async def play_next(ctx):
         if not play_queue:
             return
