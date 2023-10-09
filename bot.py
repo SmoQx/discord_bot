@@ -110,7 +110,7 @@ def run_discord_bot():
             with yt.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=False)
                 title = title + '\n' + info['title']
-        await ctx.send(f'Songs in q: \n {title}')
+        await ctx.send(f'Songs in q: {title}')
 
     @client.command()
     async def play(ctx, *url):
@@ -132,10 +132,7 @@ def run_discord_bot():
                         info = ydl.extract_info(url[0], download=False)
                     await ctx.send(f"Added to q: {info['title']}.")
             else:
-                await ctx.send("Its not an URL")
-                # Example usage:
-                for string in url:
-                    print(string)
+                await ctx.send("Searching... ")
                 query = url
                 videos = search_youtube_videos(query)
 
@@ -147,6 +144,7 @@ def run_discord_bot():
                         await play_next(ctx)
                 else:
                     print("No videos found for the given query.")
+                    await ctx.send("No videos found. :c ")
 
     @client.command()
     async def skip(ctx):
