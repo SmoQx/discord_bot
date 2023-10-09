@@ -1,3 +1,5 @@
+import time
+
 import discord
 import responses
 from discord.ext import commands
@@ -196,42 +198,5 @@ def run_discord_bot():
             await ctx.send("Left the voice channel.")
         else:
             await ctx.send("I'm not in a voice channel.")
-
-    @client.command()
-    async def splay(ctx, query):
-        async with semaphore:
-            # Check if the bot is in a voice channel
-            if ctx.voice_client is None:
-                await ctx.send('I am not in a voice channel. Use `!join` to bring me into a channel.')
-                return
-
-            if ctx.voice_client.is_playing():
-                pass
-
-            # Use Spotipy to search for tracks based on the query
-            results = sp.search(query, limit=1, type='track')
-
-            # Check if any tracks were found
-            if len(results['tracks']['items']) == 0:
-                await ctx.send('No tracks found.')
-                return
-            with open('bot.txt', 'w') as save:
-                save.write(str(results))
-
-            # Get the first track found
-            track_uri = results['tracks']['items'][0]['uri']
-
-            # Get the audio stream URL for the Spotify track
-            track_info = sp.track(track_uri)
-            audio_url = track_info['preview_url']
-
-            if audio_url is None:
-                await ctx.send('The selected track does not have a preview available.')
-                return
-
-            # Play the audio URL in the voice channel
-            ctx.voice_client.stop()
-            ctx.voice_client.play(discord.FFmpegPCMAudio(audio_url))
-            await ctx.send(f'Now playing: {results["tracks"]["items"][0]["name"]}')
 
     client.run(token)
