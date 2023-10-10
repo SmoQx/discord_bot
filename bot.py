@@ -1,12 +1,10 @@
-import time
 
+import time
 import discord
 import responses
 from discord.ext import commands
 import yt_dlp as yt
 import asyncio
-import spotipy
-from spotipy.oauth2 import SpotifyOAuth
 from urllib.parse import urlparse
 
 
@@ -47,6 +45,21 @@ def search_youtube_videos(query):
             return []
 
 
+async def time_and_print_execution_time(func):
+    # Record the start time
+    start_time = time.time()
+
+    # Run the asynchronous function
+    await func
+
+    # Record the end time
+    end_time = time.time()
+
+    # Calculate and print the execution time
+    elapsed_time = end_time - start_time
+    print(f"Execution time: {elapsed_time} seconds")
+
+
 def run_discord_bot():
     intents = discord.Intents.default()
     intents.message_content = True
@@ -77,9 +90,16 @@ def run_discord_bot():
                 info = ydl.extract_info(song, download=False)
                 url2 = info['url']
                 voice_client = ctx.voice_client
+                duration = info['duration_string']
+                print(f"Should be {duration} this long.")
+                start_time = time.time()
 
                 def after_playing(e):
                     # This function is called when the song has finished playing
+                    end_time = time.time()
+                    elapsed_time = end_time - start_time
+                    print(f"Music played for {elapsed_time / 60:.2f} min")
+                    #play_next(ctx)
                     asyncio.run_coroutine_threadsafe(play_next(ctx), client.loop)
 
                 voice_client.stop()
