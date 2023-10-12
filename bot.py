@@ -1,4 +1,4 @@
-
+import datetime
 import time
 import discord
 import responses
@@ -6,6 +6,7 @@ from discord.ext import commands
 import yt_dlp as yt
 import asyncio
 from urllib.parse import urlparse
+import os
 
 
 semaphore = asyncio.Semaphore(1)
@@ -35,7 +36,7 @@ def search_youtube_videos(query):
     }
 
     with yt.YoutubeDL(ydl_opts) as ydl:
-        search_results = ydl.extract_info(f'ytsearch:{query}', download=False)
+        search_results = ydl.extract_info(f'ytsearch:{query}', download=True)
 
         # Check if 'entries' key exists in the result (videos found)
         if 'entries' in search_results:
@@ -43,6 +44,9 @@ def search_youtube_videos(query):
             return videos
         else:
             return []
+
+
+audio_file = './current_audio.mp3'
 
 
 async def time_and_print_execution_time(func):
@@ -77,6 +81,7 @@ def run_discord_bot():
     }
 
     async def play_next(ctx):
+        global audio_file
         if not play_queue:
             return
 
@@ -92,21 +97,42 @@ def run_discord_bot():
                 voice_client = ctx.voice_client
                 duration = info['duration_string']
                 print(f"Should be {duration} this long.")
-                start_time = time.time()
 
                 def after_playing(e):
-                    # This function is called when the song has finished playing
-                    end_time = time.time()
-                    elapsed_time = end_time - start_time
-                    print(f"Music played for {elapsed_time / 60:.2f} min")
-                    #play_next(ctx)
-                    asyncio.run_coroutine_threadsafe(play_next(ctx), client.loop)
+                    print(f"PLIK AUDIO TO : {audio_file}")
+                    os.remove(audio_file)
+                    asyncio.run(play_next(ctx))
 
+                # Inside the play_next function
                 voice_client.stop()
-                voice_client.play(discord.FFmpegPCMAudio(url2), after=after_playing)
+                voice_client.play(discord.FFmpegPCMAudio(audio_file), after=after_playing)
+
+                """voice_client.stop()
+                voice_client.play(discord.FFmpegPCMAudio(url2), after=after_playing)"""
         except Exception as exception_:
             print(exception_)
         await ctx.send(f"Now playing: {info['title']}.")
+
+    async def download_and_save_audio(url):
+        global audio_file
+        with yt.YoutubeDL(ydl_opts) as ydl:
+            info_dict = ydl.extract_info(url, download=False)
+            audio_url = info_dict['formats'][0]['url']
+            # Construct a filename using the video ID
+            video_id = info_dict['id']
+            vide_title = info_dict['fulltitle']
+            audio_file = f"{vide_title} [{video_id}].mp3"
+
+            try:
+                # Check if the file exists before renaming
+                if os.path.exists(audio_file):
+                    os.rename(audio_file, "current_audio.mp3")
+                else:
+                    print(f"File '{audio_file}' not found.")
+            except FileNotFoundError as e:
+                print(f"Error renaming the file: {e}")
+
+            await asyncio.to_thread(ydl.download, [url])
 
     @client.command()
     async def list_commands(ctx):
@@ -142,6 +168,7 @@ def run_discord_bot():
                 play_queue.append(url[0])
                 print(f"IS VALID URL{url[0]}")
                 if not ctx.voice_client.is_playing():
+                    await download_and_save_audio(url[0])
                     await play_next(ctx)
                 else:
                     with yt.YoutubeDL(ydl_opts) as ydl:
@@ -157,6 +184,7 @@ def run_discord_bot():
                         print(f"Video Title: {video['title']}")
                         print(f"Video URL: https://www.youtube.com/watch?v={video['id']}")
                         play_queue.append(f"https://www.youtube.com/watch?v={video['id']}")
+                        await download_and_save_audio(f"https://www.youtube.com/watch?v={video['id']}")
                         await play_next(ctx)
                 else:
                     print("No videos found for the given query.")
