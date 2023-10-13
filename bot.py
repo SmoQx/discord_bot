@@ -1,4 +1,3 @@
-import datetime
 import time
 import discord
 import responses
@@ -90,49 +89,51 @@ def run_discord_bot():
             return
 
         try:
-            with yt.YoutubeDL(ydl_opts) as ydl:
-                song = play_queue.pop(0)
-                info = ydl.extract_info(song, download=False)
-                url2 = info['url']
-                voice_client = ctx.voice_client
-                duration = info['duration_string']
-                print(f"Should be {duration} this long.")
+            # with yt.YoutubeDL(ydl_opts) as ydl:
+            song = play_queue.pop(0)
+            await download_and_save_audio(song)
+            voice_client = ctx.voice_client
+            """info = ydl.extract_info(song, download=False)
+            url2 = info['url']
+            duration = info['duration_string']
+            print(f"Should be {duration} this long.")"""
 
-                def after_playing(e):
-                    print(f"PLIK AUDIO TO : {audio_file}")
-                    os.remove(audio_file)
-                    asyncio.run(play_next(ctx))
+            def after_playing(e):
+                print(e)
+                print(f"PLIK AUDIO TO : {audio_file}")
+                os.remove(audio_file)
+                asyncio.run(play_next(ctx))
 
-                # Inside the play_next function
-                voice_client.stop()
-                voice_client.play(discord.FFmpegPCMAudio(audio_file), after=after_playing)
+            # Inside the play_next function
+            voice_client.stop()
+            voice_client.play(discord.FFmpegPCMAudio(audio_file), after=after_playing)
 
-                """voice_client.stop()
-                voice_client.play(discord.FFmpegPCMAudio(url2), after=after_playing)"""
+            """voice_client.stop()
+            voice_client.play(discord.FFmpegPCMAudio(url2), after=after_playing)"""
         except Exception as exception_:
             print(exception_)
-        await ctx.send(f"Now playing: {info['title']}.")
 
     async def download_and_save_audio(url):
-        global audio_file
-        with yt.YoutubeDL(ydl_opts) as ydl:
-            info_dict = ydl.extract_info(url, download=False)
-            audio_url = info_dict['formats'][0]['url']
-            # Construct a filename using the video ID
-            video_id = info_dict['id']
-            vide_title = info_dict['fulltitle']
-            audio_file = f"{vide_title} [{video_id}].mp3"
+        async with semaphore:
+            global audio_file
+            with yt.YoutubeDL(ydl_opts) as ydl:
+                info_dict = ydl.extract_info(url, download=False)
+                # audio_url = info_dict['formats'][0]['url']
+                # Construct a filename using the video ID
+                video_id = info_dict['id']
+                vide_title = info_dict['fulltitle']
+                audio_file = f"{vide_title} [{video_id}].mp3"
 
-            try:
-                # Check if the file exists before renaming
-                if os.path.exists(audio_file):
-                    os.rename(audio_file, "current_audio.mp3")
-                else:
-                    print(f"File '{audio_file}' not found.")
-            except FileNotFoundError as e:
-                print(f"Error renaming the file: {e}")
+                try:
+                    # Check if the file exists before renaming
+                    if os.path.exists(audio_file):
+                        os.rename(audio_file, "current_audio.mp3")
+                    else:
+                        print(f"File '{audio_file}' not found.")
+                except FileNotFoundError as e:
+                    print(f"Error renaming the file: {e}")
 
-            await asyncio.to_thread(ydl.download, [url])
+                await asyncio.to_thread(ydl.download, [url])
 
     @client.command()
     async def list_commands(ctx):
@@ -165,15 +166,15 @@ def run_discord_bot():
                 print("already connected")
 
             if is_valid_url(url[0]):
-                play_queue.append(url[0])
-                print(f"IS VALID URL{url[0]}")
-                if not ctx.voice_client.is_playing():
-                    await download_and_save_audio(url[0])
-                    await play_next(ctx)
-                else:
-                    with yt.YoutubeDL(ydl_opts) as ydl:
-                        info = ydl.extract_info(url[0], download=False)
-                    await ctx.send(f"Added to q: {info['title']}.")
+                with yt.YoutubeDL(ydl_opts) as ydl:
+                    info = ydl.extract_info(url[0], download=False)
+                    play_queue.append(url[0])
+                    print(f"IS VALID URL{url[0]}")
+                    if not ctx.voice_client.is_playing():
+                        await play_next(ctx)
+                        await ctx.send(f"Now playing: {info['title']}.")
+                    else:
+                        await ctx.send(f"Added to q: {info['title']}.")
             else:
                 await ctx.send("Searching... ")
                 query = url
@@ -184,8 +185,11 @@ def run_discord_bot():
                         print(f"Video Title: {video['title']}")
                         print(f"Video URL: https://www.youtube.com/watch?v={video['id']}")
                         play_queue.append(f"https://www.youtube.com/watch?v={video['id']}")
-                        await download_and_save_audio(f"https://www.youtube.com/watch?v={video['id']}")
-                        await play_next(ctx)
+                        if not ctx.voice_client.is_playing():
+                            await play_next(ctx)
+                            await ctx.send(f"Now playing: {video['title']}.")
+                        else:
+                            await ctx.send(f"Added to q: {video['title']}.")
                 else:
                     print("No videos found for the given query.")
                     await ctx.send("No videos found. :c ")
@@ -199,8 +203,9 @@ def run_discord_bot():
             voice_client.stop()
             return
 
+        await play_next(ctx)
         # Get the next song URL from the queue
-        next_song = play_queue.pop(0)
+        """next_song = play_queue.pop(0)
 
         with yt.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(next_song, download=False)
@@ -208,7 +213,7 @@ def run_discord_bot():
             voice_client.stop()
             voice_client.play(discord.FFmpegPCMAudio(url2))
 
-        await ctx.send(f"Now playing: {info['title']}")
+        await ctx.send(f"Now playing: {info['title']}")"""
 
     @client.command()
     async def stop(ctx):
