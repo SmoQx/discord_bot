@@ -1,13 +1,12 @@
 import time
-
 import discord
 import responses
 from discord.ext import commands
 import yt_dlp as yt
 import asyncio
-import spotipy
-from spotipy.oauth2 import SpotifyOAuth
 from urllib.parse import urlparse
+import os
+from pathlib import Path
 
 
 semaphore = asyncio.Semaphore(1)
@@ -37,7 +36,7 @@ def search_youtube_videos(query):
     }
 
     with yt.YoutubeDL(ydl_opts) as ydl:
-        search_results = ydl.extract_info(f'ytsearch:{query}', download=False)
+        search_results = ydl.extract_info(f'ytsearch:{query}', download=True)
 
         # Check if 'entries' key exists in the result (videos found)
         if 'entries' in search_results:
@@ -47,12 +46,31 @@ def search_youtube_videos(query):
             return []
 
 
+audio_file = './current_audio.mp3'
+
+
+async def time_and_print_execution_time(func):
+    # Record the start time
+    start_time = time.time()
+
+    # Run the asynchronous function
+    await func
+
+    # Record the end time
+    end_time = time.time()
+
+    # Calculate and print the execution time
+    elapsed_time = end_time - start_time
+    print(f"Execution time: {elapsed_time} seconds")
+
+
 def run_discord_bot():
     intents = discord.Intents.default()
     intents.message_content = True
-    token = 'NjkwOTkyNjM4NjM5MzQxNjI5.GXNezh.MBI7BhO6auPjtbwYq6orlA07voB73Ar4MMGdv8'
+    token = 'token_here'
     client = commands.Bot(command_prefix='!', intents=intents)
     play_queue = []
+    audio_files_list = []
 
     ydl_opts = {
         'format': 'bestaudio/best',
@@ -64,6 +82,7 @@ def run_discord_bot():
     }
 
     async def play_next(ctx):
+        global audio_file
         if not play_queue:
             return
 
@@ -72,21 +91,70 @@ def run_discord_bot():
             return
 
         try:
-            with yt.YoutubeDL(ydl_opts) as ydl:
-                song = play_queue.pop(0)
-                info = ydl.extract_info(song, download=False)
-                url2 = info['url']
-                voice_client = ctx.voice_client
+            # with yt.YoutubeDL(ydl_opts) as ydl:
+            song = play_queue.pop(0)
+            await download_and_save_audio(song)
+            voice_client = ctx.voice_client
+            print(f"Files in audio file list: \n{audio_files_list}")
 
-                def after_playing(e):
-                    # This function is called when the song has finished playing
-                    asyncio.run_coroutine_threadsafe(play_next(ctx), client.loop)
+            def after_playing(e):
+                print(f"PLIK AUDIO TO : {audio_file}")
+                if audio_file not in audio_files_list:
+                    audio_files_list.append(audio_file)
+                if play_queue:
+                    asyncio.run(play_next(ctx))
+                else:
+                    print("play q empty")
+                    asyncio.run(cleanup(ctx))
 
-                voice_client.stop()
-                voice_client.play(discord.FFmpegPCMAudio(url2), after=after_playing)
+            # Inside the play_next function
+            voice_client.stop()
+            voice_client.play(discord.FFmpegPCMAudio(audio_file), after=after_playing)
+
         except Exception as exception_:
             print(exception_)
-        await ctx.send(f"Now playing: {info['title']}.")
+
+    async def download_and_save_audio(url):
+        global audio_file
+        with yt.YoutubeDL(ydl_opts) as ydl:
+            info_dict = ydl.extract_info(url, download=False)
+            # audio_url = info_dict['formats'][0]['url']
+            # Construct a filename using the video ID
+            video_id = info_dict['id']
+            vide_title = info_dict['fulltitle']
+            audio_file = f"{vide_title} [{video_id}].mp3"
+            curent_ = Path("current_audio.mp3")
+
+            try:
+                # Check if the file exists before renaming
+                if os.path.exists(audio_file):
+                    return
+                else:
+                    print(f"File '{audio_file}' not found.")
+            except FileNotFoundError as e:
+                print(f"Error renaming the file: {e}")
+
+            await asyncio.to_thread(ydl.download, [url])
+
+
+    @client.command()
+    async def cleanup(ctx):
+        # Your cleanup code to delete the file.
+        files = audio_files_list
+        print(files)
+        for file in files:
+            try:
+                if os.path.exists(file):
+                    os.remove(file)
+                    print(f"Removed {file}")
+                    audio_files_list.remove(file)
+                elif not os.path.exists(file):
+                    pass
+                    #print(f"{file} removed from a file list.")
+            except FileNotFoundError:
+                pass
+            except Exception as e:
+                print(f"Error while deleting file: {e}")
 
     @client.command()
     async def list_commands(ctx):
@@ -119,14 +187,15 @@ def run_discord_bot():
                 print("already connected")
 
             if is_valid_url(url[0]):
-                play_queue.append(url[0])
-                print(f"IS VALID URL{url[0]}")
-                if not ctx.voice_client.is_playing():
-                    await play_next(ctx)
-                else:
-                    with yt.YoutubeDL(ydl_opts) as ydl:
-                        info = ydl.extract_info(url[0], download=False)
-                    await ctx.send(f"Added to q: {info['title']}.")
+                with yt.YoutubeDL(ydl_opts) as ydl:
+                    info = ydl.extract_info(url[0], download=False)
+                    play_queue.append(url[0])
+                    print(f"IS VALID URL{url[0]}")
+                    if not ctx.voice_client.is_playing():
+                        await play_next(ctx)
+                        await ctx.send(f"Now playing: {info['title']}.")
+                    else:
+                        await ctx.send(f"Added to q: {info['title']}.")
             else:
                 await ctx.send("Searching... ")
                 query = url
@@ -137,7 +206,12 @@ def run_discord_bot():
                         print(f"Video Title: {video['title']}")
                         print(f"Video URL: https://www.youtube.com/watch?v={video['id']}")
                         play_queue.append(f"https://www.youtube.com/watch?v={video['id']}")
-                        await play_next(ctx)
+                        if not ctx.voice_client.is_playing():
+
+                            await play_next(ctx)
+                            await ctx.send(f"Now playing: {video['title']}.")
+                        else:
+                            await ctx.send(f"Added to q: {video['title']}.")
                 else:
                     print("No videos found for the given query.")
                     await ctx.send("No videos found. :c ")
@@ -145,14 +219,16 @@ def run_discord_bot():
     @client.command()
     async def skip(ctx):
         # Check if there are songs in the queue
+        global audio_file
         voice_client = ctx.voice_client
         if not play_queue:
             await ctx.send("The play queue is empty.")
             voice_client.stop()
             return
-
+        voice_client.stop()
+        # await play_next(ctx)
         # Get the next song URL from the queue
-        next_song = play_queue.pop(0)
+        """next_song = play_queue.pop(0)
 
         with yt.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(next_song, download=False)
@@ -160,7 +236,7 @@ def run_discord_bot():
             voice_client.stop()
             voice_client.play(discord.FFmpegPCMAudio(url2))
 
-        await ctx.send(f"Now playing: {info['title']}")
+        await ctx.send(f"Now playing: {info['title']}")"""
 
     @client.command()
     async def stop(ctx):
@@ -194,3 +270,4 @@ def run_discord_bot():
             await ctx.send("I'm not in a voice channel.")
 
     client.run(token)
+    asyncio.run(cleanup(0))
