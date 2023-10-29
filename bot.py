@@ -67,7 +67,7 @@ async def time_and_print_execution_time(func):
 def run_discord_bot():
     intents = discord.Intents.default()
     intents.message_content = True
-    token = 'token_here'
+    token = 'NjkwOTkyNjM4NjM5MzQxNjI5.GjTf3l.jWQcyNkN6EeJ3WR4I9SOGvuCTz8QipzLDYiQ5Y'
     client = commands.Bot(command_prefix='!', intents=intents)
     play_queue = []
     audio_files_list = []
@@ -101,6 +101,8 @@ def run_discord_bot():
                 print(f"PLIK AUDIO TO : {audio_file}")
                 if audio_file not in audio_files_list:
                     audio_files_list.append(audio_file)
+                    print(audio_file)
+                    #os.remove("current_song.mp3")
                 if play_queue:
                     asyncio.run(play_next(ctx))
                 else:
@@ -109,6 +111,7 @@ def run_discord_bot():
 
             # Inside the play_next function
             voice_client.stop()
+            #os.renames(audio_file, "current_song.mp3")
             voice_client.play(discord.FFmpegPCMAudio(audio_file), after=after_playing)
 
         except Exception as exception_:
@@ -116,13 +119,16 @@ def run_discord_bot():
 
     async def download_and_save_audio(url):
         global audio_file
-        with yt.YoutubeDL(ydl_opts) as ydl:
+        local_ydl_opts = ydl_opts.copy()
+        local_ydl_opts['outtmpl'] =  "/%(id)s"
+        with yt.YoutubeDL(local_ydl_opts) as ydl:
             info_dict = ydl.extract_info(url, download=False)
             # audio_url = info_dict['formats'][0]['url']
             # Construct a filename using the video ID
             video_id = info_dict['id']
             vide_title = info_dict['fulltitle']
-            audio_file = f"{vide_title} [{video_id}].mp3"
+            # safe_title = vide_title.replace('"', '_')
+            audio_file = f'{video_id}.mp3'
             curent_ = Path("current_audio.mp3")
 
             try:
@@ -135,7 +141,6 @@ def run_discord_bot():
                 print(f"Error renaming the file: {e}")
 
             await asyncio.to_thread(ydl.download, [url])
-
 
     @client.command()
     async def cleanup(ctx):
@@ -150,7 +155,7 @@ def run_discord_bot():
                     audio_files_list.remove(file)
                 elif not os.path.exists(file):
                     pass
-                    #print(f"{file} removed from a file list.")
+                    # print(f"{file} removed from a file list.")
             except FileNotFoundError:
                 pass
             except Exception as e:
