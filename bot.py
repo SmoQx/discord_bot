@@ -67,7 +67,7 @@ async def time_and_print_execution_time(func):
 def run_discord_bot():
     intents = discord.Intents.default()
     intents.message_content = True
-    token = ''
+    token = 'NjkwOTkyNjM4NjM5MzQxNjI5.Gmyvto.qhfd15-TTCK3ClayKCk4XH9sp3Cwoq2SxrpL-I'
     client = commands.Bot(command_prefix='!', intents=intents)
     play_queue = []
     audio_files_list = []
@@ -120,7 +120,7 @@ def run_discord_bot():
     async def download_and_save_audio(url):
         global audio_file
         local_ydl_opts = ydl_opts.copy()
-        local_ydl_opts['outtmpl'] =  "/%(id)s"
+        local_ydl_opts['outtmpl'] = "%(id)s"
         with yt.YoutubeDL(local_ydl_opts) as ydl:
             info_dict = ydl.extract_info(url, download=False)
             # audio_url = info_dict['formats'][0]['url']
