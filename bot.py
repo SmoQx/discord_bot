@@ -67,7 +67,7 @@ async def time_and_print_execution_time(func):
 def run_discord_bot():
     intents = discord.Intents.default()
     intents.message_content = True
-    token = 'NjkwOTkyNjM4NjM5MzQxNjI5.GjTf3l.jWQcyNkN6EeJ3WR4I9SOGvuCTz8QipzLDYiQ5Y'
+    token = ''
     client = commands.Bot(command_prefix='!', intents=intents)
     play_queue = []
     audio_files_list = []
