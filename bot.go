@@ -146,6 +146,7 @@ func PlayMusic(vc *discordgo.VoiceConnection, filePath string, discord *discordg
 		Playing: true,
 		VC:      vc,
 	}
+	vc.Speaking(true)
 	ffmpeg := exec.Command("ffmpeg", "-i", filePath, "-f", "s16le", "-ar", "48000", "-ac", "2", "pipe:1")
 	ffmpegOut, erro := ffmpeg.StdoutPipe()
 	if erro != nil {
@@ -161,7 +162,11 @@ func PlayMusic(vc *discordgo.VoiceConnection, filePath string, discord *discordg
 	encoder, _ := gopus.NewEncoder(48000, 2, gopus.Audio)
 	pcm := make([]int16, 960*2) // 20ms stereo
 
-	for err := binary.Read(ffmpegOut, binary.LittleEndian, pcm); err == nil; {
+	for {
+		err := binary.Read(ffmpegOut, binary.LittleEndian, pcm)
+		if err != nil {
+			break
+		}
 		opus, _ := encoder.Encode(pcm, 960, 960*2*2)
 		vc.OpusSend <- opus
 	}
@@ -171,7 +176,8 @@ func PlayMusic(vc *discordgo.VoiceConnection, filePath string, discord *discordg
 }
 
 func StopMusic(vc *discordgo.VoiceConnection, discord *discordgo.Session, message *discordgo.MessageCreate) {
-	close(vc.OpusSend)
+	vc.Speaking(false)
+	//close(vc.OpusSend)
 	players[vc.GuildID].Playing = false
 	discord.ChannelMessageSend(message.ChannelID, "Now stoping")
 }
@@ -220,6 +226,7 @@ func DownlaodMusicFromLink(link string) (string, error) {
 	if erro != nil {
 		return "", erro
 	}
+	fmt.Println(data)
 	if data["id"] != nil {
 		id_numer, ok := data["id"].(string)
 		if !ok {
