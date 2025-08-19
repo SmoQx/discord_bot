@@ -102,6 +102,7 @@ func voiceStateUpdate(s *discordgo.Session, vs *discordgo.VoiceStateUpdate) {
 		fmt.Println("No one left, leaving channel.")
 		vc.Disconnect()
 		delete(voiceConnections, vs.GuildID)
+		delete(players, vs.GuildID)
 	}
 	fmt.Println("memeber count :", memberCount, "voice channel bot id", botChannelID)
 }
@@ -141,6 +142,7 @@ func LeaveServer(discord *discordgo.Session, message *discordgo.MessageCreate) {
 	if vc, ok := discord.VoiceConnections[message.GuildID]; ok {
 		vc.Disconnect()
 		delete(voiceConnections, vc.GuildID)
+		delete(players, vc.GuildID)
 		discord.ChannelMessageSend(message.ChannelID, "Leaveing the voice channel")
 	} else {
 		discord.ChannelMessageSend(message.ChannelID, "I'm not in a voice channel")
@@ -229,11 +231,15 @@ func IsPlaying(guildID string) bool {
 }
 
 func CheckIfCachedMusic(filepath string) bool {
-	if _, err := os.Stat(filepath); os.IsExist(err) {
-		fmt.Println("File already exists in cache")
+	if _, err := os.Stat(filepath); err == nil {
+		fmt.Println("File already exists in cache:", filepath)
 		return true
+	} else if os.IsNotExist(err) {
+		return false
+	} else {
+		fmt.Println("Error checking file:", err)
+		return false
 	}
-	return false
 }
 
 func DownlaodMusicFromLink(link string) (Song, error) {
@@ -321,6 +327,73 @@ func SkipMusic(vc *discordgo.VoiceConnection, discord *discordgo.Session, messag
 	}
 }
 
+func GetVideoIDFromLink(link string) (Song, error) {
+	ytdlp.MustInstallAll(context.TODO())
+
+	dl := ytdlp.New().
+		PrintJSON().
+		NoProgress()
+
+	r, err := dl.Run(context.TODO(), link)
+	if err != nil {
+		return Song{}, err
+	}
+
+	var data map[string]any
+	if err := json.Unmarshal([]byte(r.Stdout), &data); err != nil {
+		return Song{}, err
+	}
+
+	id, _ := data["id"].(string)
+	title, _ := data["title"].(string)
+
+	return Song{
+		Title:    title,
+		Filename: id + ".mp3",
+	}, nil
+}
+
+func GetVideoIDFromQuerry(query string) (Song, error) {
+	ytdlp.MustInstallAll(context.TODO())
+
+	searchQuery := fmt.Sprintf("ytsearch1:%s", query)
+
+	dl := ytdlp.New().
+		PrintJSON().
+		NoProgress()
+
+	r, err := dl.Run(context.TODO(), searchQuery)
+	if err != nil {
+		return Song{}, err
+	}
+
+	var data map[string]any
+	if err := json.Unmarshal([]byte(r.Stdout), &data); err != nil {
+		return Song{}, err
+	}
+
+	id, _ := data["id"].(string)
+	title, _ := data["title"].(string)
+
+	return Song{
+		Title:    title,
+		Filename: id + ".mp3",
+	}, nil
+}
+
+func showQueue(player *VoicePlayer) string {
+	if len(player.Queue) == 0 {
+		return "Queue is empty."
+	}
+
+	var titles []string
+	for _, song := range player.Queue {
+		titles = append(titles, song.Title)
+	}
+
+	return strings.Join(titles, "\n") // join titles with newlines
+}
+
 func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 	if message.Author.ID == discord.State.User.ID {
 		return
@@ -329,6 +402,12 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 	case strings.Contains(message.Content, "!help"):
 		PrintHelp(discord, message)
 	case strings.Contains(message.Content, "!queue"):
+		vs, err := findUserVoiceState(discord, message.GuildID, message.Author.ID)
+		if err != nil {
+			return
+		}
+		player, _ := players[vs.GuildID]
+		discord.ChannelMessageSend(message.ChannelID, showQueue(player))
 	case strings.Contains(message.Content, "!download_q"):
 		parts := strings.Split(message.Content, " ")
 		querry := strings.Join(parts[1:], " ")
@@ -359,9 +438,19 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 		// Download song (either by search or link)
 		var song Song
 		if len(parts) > 2 {
-			song, err = DownlaodMusicFromQuerry(query)
+			song, err = GetVideoIDFromQuerry(query)
+			if !CheckIfCachedMusic(song.Filename) {
+				discord.ChannelMessageSend(message.ChannelID, "Downloading started")
+				song, err = DownlaodMusicFromQuerry(query)
+				discord.ChannelMessageSend(message.ChannelID, "Downloaded"+song.Title)
+			}
 		} else if len(parts) == 2 {
-			song, err = DownlaodMusicFromLink(query)
+			song, err = GetVideoIDFromLink(query)
+			if !CheckIfCachedMusic(song.Filename) {
+				discord.ChannelMessageSend(message.ChannelID, "Downloading started")
+				song, err = DownlaodMusicFromLink(query)
+				discord.ChannelMessageSend(message.ChannelID, "Downloaded"+song.Title)
+			}
 		}
 		if err != nil {
 			discord.ChannelMessageSend(message.ChannelID, "Failed to download: "+err.Error())
@@ -388,6 +477,7 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 	case strings.Contains(message.Content, "!stop"):
 		StopMusic(voiceConnections[message.GuildID], discord, message)
 	case strings.Contains(message.Content, "!leave"):
+		StopMusic(voiceConnections[message.GuildID], discord, message)
 		LeaveServer(discord, message)
 	}
 }
