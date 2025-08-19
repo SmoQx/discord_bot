@@ -23,10 +23,10 @@ var voiceConnections = make(map[string]*discordgo.VoiceConnection)
 type VoicePlayer struct {
 	Playing bool
 	VC      *discordgo.VoiceConnection
+	Queue   []string
 }
 
 var players = make(map[string]*VoicePlayer)
-var PlayerQueue = make(map[string]*VoicePlayer)
 
 func checkNilErr(e error) {
 	if e != nil {
@@ -200,12 +200,12 @@ func DownlaodMusicFromLink(link string) (string, error) {
 	ytdlp.MustInstallAll(context.TODO())
 
 	dl := ytdlp.New().
+		PrintJSON().
 		NoProgress().
-		FormatSort("res,ext:mp4:m4a").
-		RecodeVideo("mp4").
-		NoPlaylist().
-		NoOverwrites().
-		Continue().
+		FormatSort("bestaudio").
+		ExtractAudio().
+		AudioFormat("mp3").
+		Output("%(id)s.%(ext)s").
 		ProgressFunc(100*time.Millisecond, func(prog ytdlp.ProgressUpdate) {
 			fmt.Printf( //nolint:forbidigo
 				"%s @ %s [eta: %s] :: %s\n",
@@ -214,8 +214,7 @@ func DownlaodMusicFromLink(link string) (string, error) {
 				prog.ETA(),
 				prog.Filename,
 			)
-		}).
-		Output("%(id)s.%(ext)s")
+		})
 
 	r, err := dl.Run(context.TODO(), link)
 	if err != nil {
@@ -234,7 +233,7 @@ func DownlaodMusicFromLink(link string) (string, error) {
 			return "", fmt.Errorf("There is and error while trying to conver id to string")
 		}
 		fmt.Println("stdout\n", data["id"])
-		return id_numer + ".mp4", nil
+		return id_numer + ".mp3", nil
 	}
 	return "", fmt.Errorf("filename not found")
 }
@@ -304,35 +303,48 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 	case strings.Contains(message.Content, "!skip"):
 	case strings.Contains(message.Content, "!play"):
 		vs, err := findUserVoiceState(discord, message.GuildID, message.Author.ID)
+		if err != nil {
+			discord.ChannelMessageSend(message.ChannelID, "You must be in a voice channel first!")
+			return
+		}
 
 		parts := strings.Split(message.Content, " ")
 		querry := strings.Join(parts[1:], " ")
 
+		// Ensure bot joins if not already
 		if _, ok := voiceConnections[vs.GuildID]; !ok {
 			JoinServer(discord, message)
 		}
+
 		var filename string
 		var erro error
-		if err == nil {
-			if len(parts) > 2 {
-				fmt.Println("parts", parts)
-				fmt.Println("querry", querry)
-				filename, erro = DownlaodMusicFromQuerry(querry)
-			} else if len(parts) == 2 {
-				fmt.Println("parts", parts)
-				fmt.Println("parts", parts[1])
-				fmt.Println("querry", querry)
-				filename, erro = DownlaodMusicFromLink(querry)
-			}
-			if erro == nil {
-				if !IsPlaying(vs.GuildID) {
-					PlayMusic(voiceConnections[vs.GuildID], filename, discord, message)
-				} else {
-					discord.ChannelMessageSend(message.ChannelID, "already playing ")
-				}
-			}
+
+		if len(parts) > 2 {
+			// Search query
+			filename, erro = DownlaodMusicFromQuerry(querry)
+		} else if len(parts) == 2 {
+			// Direct link
+			filename, erro = DownlaodMusicFromLink(querry)
+		}
+
+		if erro != nil {
+			discord.ChannelMessageSend(message.ChannelID, "Failed to download music: "+erro.Error())
+			return
+		}
+
+		player, ok := players[vs.GuildID]
+		if !ok {
+			player = &VoicePlayer{VC: voiceConnections[vs.GuildID], Queue: []string{}}
+			players[vs.GuildID] = player
+		}
+
+		if player.Playing {
+			// Add to queue
+			player.Queue = append(player.Queue, filename)
+			discord.ChannelMessageSend(message.ChannelID, "Added to queue: "+filename)
 		} else {
-			discord.ChannelMessageSend(message.ChannelID, "There was an error while trying to play the music")
+			// Play immediately
+			go PlayMusic(player, filename, discord, message)
 		}
 	case strings.Contains(message.Content, "!stop"):
 		StopMusic(voiceConnections[message.GuildID], discord, message)
@@ -343,5 +355,4 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 
 func main() {
 	Run()
-
 }
