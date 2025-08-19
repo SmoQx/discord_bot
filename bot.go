@@ -10,7 +10,6 @@ import (
 	"os/exec"
 	"os/signal"
 	"strings"
-	"time"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/lrstanley/go-ytdlp"
@@ -20,10 +19,17 @@ import (
 var BotToken string
 var voiceConnections = make(map[string]*discordgo.VoiceConnection)
 
+type Song struct {
+	Title    string
+	Filename string
+}
+
 type VoicePlayer struct {
-	Playing bool
-	VC      *discordgo.VoiceConnection
-	Queue   []string
+	Playing     bool
+	VC          *discordgo.VoiceConnection
+	Queue       []Song
+	FFmpegCmd   *exec.Cmd
+	AutoAdvance bool
 }
 
 var players = make(map[string]*VoicePlayer)
@@ -141,21 +147,27 @@ func LeaveServer(discord *discordgo.Session, message *discordgo.MessageCreate) {
 	}
 }
 
-func PlayMusic(vc *discordgo.VoiceConnection, filePath string, discord *discordgo.Session, message *discordgo.MessageCreate) {
-	players[vc.GuildID] = &VoicePlayer{
-		Playing: true,
-		VC:      vc,
-	}
+func PlayMusic(player *VoicePlayer, song Song, discord *discordgo.Session, message *discordgo.MessageCreate) {
+	// Start a fresh playback: allow auto-advance unless a skip/stop disables it
+	player.Playing = true
+	player.AutoAdvance = true
+
+	vc := player.VC
+	discord.ChannelMessageSend(message.ChannelID, "Now playing: **"+song.Title+"**")
+
 	vc.Speaking(true)
-	ffmpeg := exec.Command("ffmpeg", "-i", filePath, "-f", "s16le", "-ar", "48000", "-ac", "2", "pipe:1")
-	ffmpegOut, erro := ffmpeg.StdoutPipe()
-	if erro != nil {
-		fmt.Println(erro)
-		discord.ChannelMessageSend(message.ChannelID, "There was an error while trying to play the music")
-	}
-	err := ffmpeg.Start()
+	ffmpeg := exec.Command("ffmpeg", "-i", song.Filename, "-f", "s16le", "-ar", "48000", "-ac", "2", "pipe:1")
+	player.FFmpegCmd = ffmpeg
+
+	ffmpegOut, err := ffmpeg.StdoutPipe()
 	if err != nil {
+		fmt.Println("ffmpeg StdoutPipe error:", err)
+		discord.ChannelMessageSend(message.ChannelID, "Error starting audio pipeline.")
+		return
+	}
+	if err := ffmpeg.Start(); err != nil {
 		fmt.Println("Error starting ffmpeg:", err)
+		discord.ChannelMessageSend(message.ChannelID, "Error starting ffmpeg.")
 		return
 	}
 
@@ -163,23 +175,52 @@ func PlayMusic(vc *discordgo.VoiceConnection, filePath string, discord *discordg
 	pcm := make([]int16, 960*2) // 20ms stereo
 
 	for {
-		err := binary.Read(ffmpegOut, binary.LittleEndian, pcm)
-		if err != nil {
+		if err := binary.Read(ffmpegOut, binary.LittleEndian, pcm); err != nil {
 			break
 		}
 		opus, _ := encoder.Encode(pcm, 960, 960*2*2)
 		vc.OpusSend <- opus
+
+		if !player.Playing { // stop/skip requested
+			break
+		}
 	}
 
-	ffmpeg.Wait()
-	players[vc.GuildID].Playing = false
+	// Tear down this playback
+	_ = ffmpeg.Wait()
+	vc.Speaking(false)
+	player.FFmpegCmd = nil
+	player.Playing = false
+
+	if player.AutoAdvance && len(player.Queue) > 0 {
+		next := player.Queue[0]
+		player.Queue = player.Queue[1:]
+		go PlayMusic(player, next, discord, message)
+	} else if !player.AutoAdvance {
+		// skip/stop handled the next step explicitly
+	} else {
+		discord.ChannelMessageSend(message.ChannelID, "Queue finished.")
+	}
 }
 
 func StopMusic(vc *discordgo.VoiceConnection, discord *discordgo.Session, message *discordgo.MessageCreate) {
+	player, ok := players[vc.GuildID]
+	if !ok || !player.Playing {
+		discord.ChannelMessageSend(message.ChannelID, "No music is currently playing.")
+		return
+	}
+
+	player.AutoAdvance = false
+	player.Playing = false
+
+	if player.FFmpegCmd != nil {
+		_ = player.FFmpegCmd.Process.Kill()
+		player.FFmpegCmd = nil
+	}
+
+	player.Queue = []Song{}
 	vc.Speaking(false)
-	//close(vc.OpusSend)
-	players[vc.GuildID].Playing = false
-	discord.ChannelMessageSend(message.ChannelID, "Now stoping")
+	discord.ChannelMessageSend(message.ChannelID, "Stopped playback and cleared the queue.")
 }
 
 func IsPlaying(guildID string) bool {
@@ -195,8 +236,7 @@ func CheckIfCachedMusic(filepath string) bool {
 	return false
 }
 
-func DownlaodMusicFromLink(link string) (string, error) {
-	//os.Setenv("YTDLP_DEBUG", "true")
+func DownlaodMusicFromLink(link string) (Song, error) {
 	ytdlp.MustInstallAll(context.TODO())
 
 	dl := ytdlp.New().
@@ -205,79 +245,80 @@ func DownlaodMusicFromLink(link string) (string, error) {
 		FormatSort("bestaudio").
 		ExtractAudio().
 		AudioFormat("mp3").
-		Output("%(id)s.%(ext)s").
-		ProgressFunc(100*time.Millisecond, func(prog ytdlp.ProgressUpdate) {
-			fmt.Printf( //nolint:forbidigo
-				"%s @ %s [eta: %s] :: %s\n",
-				prog.Status,
-				prog.PercentString(),
-				prog.ETA(),
-				prog.Filename,
-			)
-		})
+		Output("%(id)s.%(ext)s")
 
 	r, err := dl.Run(context.TODO(), link)
 	if err != nil {
-		return "", err
+		return Song{}, err
 	}
 	var data map[string]any
-	erro := json.Unmarshal([]byte(r.Stdout), &data)
-	if erro != nil {
-		return "", erro
+	if err := json.Unmarshal([]byte(r.Stdout), &data); err != nil {
+		return Song{}, err
 	}
-	fmt.Println(data)
-	if data["id"] != nil {
-		id_numer, ok := data["id"].(string)
-		if !ok {
-			fmt.Println("There is and error while trying to conver id to string")
-			return "", fmt.Errorf("There is and error while trying to conver id to string")
-		}
-		fmt.Println("stdout\n", data["id"])
-		return id_numer + ".mp3", nil
-	}
-	return "", fmt.Errorf("filename not found")
+
+	id, _ := data["id"].(string)
+	title, _ := data["title"].(string)
+
+	return Song{
+		Title:    title,
+		Filename: id + ".mp3",
+	}, nil
 }
 
-func DownlaodMusicFromQuerry(querry string) (string, error) {
+func DownlaodMusicFromQuerry(querry string) (Song, error) {
 	ytdlp.MustInstallAll(context.TODO())
 
 	query := fmt.Sprintf("ytsearch1:%s", querry)
-
 	dl := ytdlp.New().
 		PrintJSON().
 		NoProgress().
 		FormatSort("bestaudio").
 		ExtractAudio().
 		AudioFormat("mp3").
-		Output("%(id)s.%(ext)s").
-		ProgressFunc(100*time.Millisecond, func(prog ytdlp.ProgressUpdate) {
-			fmt.Printf("%s @ %s [eta: %s] :: %s\n",
-				prog.Status,
-				prog.PercentString(),
-				prog.ETA(),
-				prog.Filename,
-			)
-		})
+		Output("%(id)s.%(ext)s")
 
 	r, err := dl.Run(context.TODO(), query)
 	if err != nil {
-		return "", err
+		return Song{}, err
 	}
 	var data map[string]any
-	erro := json.Unmarshal([]byte(r.Stdout), &data)
-	if erro != nil {
-		return "", erro
+	if err := json.Unmarshal([]byte(r.Stdout), &data); err != nil {
+		return Song{}, err
 	}
-	if data["id"] != nil {
-		id_numer, ok := data["id"].(string)
-		if !ok {
-			fmt.Println("There is and error while trying to conver id to string")
-			return "", fmt.Errorf("There is and error while trying to conver id to string")
-		}
-		fmt.Println("stdout\n", data["id"])
-		return id_numer + ".mp3", nil
+
+	id, _ := data["id"].(string)
+	title, _ := data["title"].(string)
+
+	return Song{
+		Title:    title,
+		Filename: id + ".mp3",
+	}, nil
+}
+
+func SkipMusic(vc *discordgo.VoiceConnection, discord *discordgo.Session, message *discordgo.MessageCreate) {
+	player, ok := players[vc.GuildID]
+	if !ok || !player.Playing {
+		discord.ChannelMessageSend(message.ChannelID, "No music is currently playing.")
+		return
 	}
-	return "", fmt.Errorf("filename not found")
+
+	// Prevent the current PlayMusic from auto-advancing
+	player.AutoAdvance = false
+	player.Playing = false
+
+	if player.FFmpegCmd != nil {
+		_ = player.FFmpegCmd.Process.Kill()
+		player.FFmpegCmd = nil
+	}
+
+	if len(player.Queue) > 0 {
+		next := player.Queue[0]
+		player.Queue = player.Queue[1:]
+		discord.ChannelMessageSend(message.ChannelID, "Skipping… Now playing: **"+next.Title+"**")
+		go PlayMusic(player, next, discord, message) // this new PlayMusic will reset AutoAdvance=true
+	} else {
+		discord.ChannelMessageSend(message.ChannelID, "Skipped. No more songs in the queue.")
+	}
 }
 
 func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
@@ -301,50 +342,48 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 	case strings.Contains(message.Content, "!join"):
 		JoinServer(discord, message)
 	case strings.Contains(message.Content, "!skip"):
+		if vc, ok := voiceConnections[message.GuildID]; ok {
+			SkipMusic(vc, discord, message)
+		} else {
+			discord.ChannelMessageSend(message.ChannelID, "I'm not in a voice channel.")
+		}
 	case strings.Contains(message.Content, "!play"):
 		vs, err := findUserVoiceState(discord, message.GuildID, message.Author.ID)
-		if err != nil {
-			discord.ChannelMessageSend(message.ChannelID, "You must be in a voice channel first!")
-			return
-		}
-
 		parts := strings.Split(message.Content, " ")
-		querry := strings.Join(parts[1:], " ")
+		query := strings.Join(parts[1:], " ")
 
-		// Ensure bot joins if not already
 		if _, ok := voiceConnections[vs.GuildID]; !ok {
 			JoinServer(discord, message)
 		}
 
-		var filename string
-		var erro error
-
+		// Download song (either by search or link)
+		var song Song
 		if len(parts) > 2 {
-			// Search query
-			filename, erro = DownlaodMusicFromQuerry(querry)
+			song, err = DownlaodMusicFromQuerry(query)
 		} else if len(parts) == 2 {
-			// Direct link
-			filename, erro = DownlaodMusicFromLink(querry)
+			song, err = DownlaodMusicFromLink(query)
 		}
-
-		if erro != nil {
-			discord.ChannelMessageSend(message.ChannelID, "Failed to download music: "+erro.Error())
+		if err != nil {
+			discord.ChannelMessageSend(message.ChannelID, "Failed to download: "+err.Error())
 			return
 		}
 
 		player, ok := players[vs.GuildID]
 		if !ok {
-			player = &VoicePlayer{VC: voiceConnections[vs.GuildID], Queue: []string{}}
+			player = &VoicePlayer{
+				VC:          voiceConnections[vs.GuildID],
+				Queue:       []Song{},
+				AutoAdvance: true,
+			}
 			players[vs.GuildID] = player
 		}
 
+		// If playing, add to queue, otherwise play immediately
 		if player.Playing {
-			// Add to queue
-			player.Queue = append(player.Queue, filename)
-			discord.ChannelMessageSend(message.ChannelID, "Added to queue: "+filename)
+			player.Queue = append(player.Queue, song)
+			discord.ChannelMessageSend(message.ChannelID, "Added to queue: **"+song.Title+"**")
 		} else {
-			// Play immediately
-			go PlayMusic(player, filename, discord, message)
+			go PlayMusic(player, song, discord, message)
 		}
 	case strings.Contains(message.Content, "!stop"):
 		StopMusic(voiceConnections[message.GuildID], discord, message)
