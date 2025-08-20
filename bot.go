@@ -158,7 +158,7 @@ func PlayMusic(player *VoicePlayer, song Song, discord *discordgo.Session, messa
 	discord.ChannelMessageSend(message.ChannelID, "Now playing: **"+song.Title+"**")
 
 	vc.Speaking(true)
-	ffmpeg := exec.Command("ffmpeg", "-i", song.Filename, "-f", "s16le", "-ar", "48000", "-ac", "2", "pipe:1")
+	ffmpeg := exec.Command("ffmpeg", "-i", "./cache/"+song.Filename, "-f", "s16le", "-ar", "48000", "-ac", "2", "pipe:1")
 	player.FFmpegCmd = ffmpeg
 
 	ffmpegOut, err := ffmpeg.StdoutPipe()
@@ -247,11 +247,12 @@ func DownlaodMusicFromLink(link string) (Song, error) {
 
 	dl := ytdlp.New().
 		PrintJSON().
+		NoPlaylist().
 		NoProgress().
 		FormatSort("bestaudio").
 		ExtractAudio().
 		AudioFormat("mp3").
-		Output("%(id)s.%(ext)s")
+		Output("./cache/%(id)s.%(ext)s")
 
 	r, err := dl.Run(context.TODO(), link)
 	if err != nil {
@@ -277,11 +278,12 @@ func DownlaodMusicFromQuerry(querry string) (Song, error) {
 	query := fmt.Sprintf("ytsearch1:%s", querry)
 	dl := ytdlp.New().
 		PrintJSON().
+		NoPlaylist().
 		NoProgress().
 		FormatSort("bestaudio").
 		ExtractAudio().
 		AudioFormat("mp3").
-		Output("%(id)s.%(ext)s")
+		Output("./cache/%(id)s.%(ext)s")
 
 	r, err := dl.Run(context.TODO(), query)
 	if err != nil {
@@ -381,6 +383,87 @@ func GetVideoIDFromQuerry(query string) (Song, error) {
 	}, nil
 }
 
+func IsPlaylist(link string) (bool, error) {
+	ytdlp.MustInstallAll(context.TODO())
+
+	dl := ytdlp.New().
+		PrintJSON().
+		LazyPlaylist() // ✅ only fetch high-level info, not all videos
+
+	r, err := dl.Run(context.TODO(), link)
+	if err != nil {
+		return false, err
+	}
+
+	var data map[string]interface{}
+	if err := json.Unmarshal([]byte(r.Stdout), &data); err != nil {
+		return false, err
+	}
+
+	// If "entries" key exists → it's a playlist
+	if _, ok := data["entries"]; ok {
+		return true, nil
+	}
+
+	return false, nil
+}
+
+func FetchPlaylistEntries(link string) ([]string, error) {
+	ytdlp.MustInstallAll(context.TODO())
+
+	r, err := ytdlp.New().
+		PrintJSON().
+		DumpSingleJSON().
+		Run(context.TODO(), link)
+	if err != nil {
+		return nil, err
+	}
+
+	var data map[string]any
+	if err := json.Unmarshal([]byte(r.Stdout), &data); err != nil {
+		return nil, err
+	}
+
+	entries, ok := data["entries"].([]any)
+	if !ok {
+		return nil, fmt.Errorf("not a playlist or missing entries")
+	}
+
+	urls := make([]string, 0, len(entries))
+	for _, e := range entries {
+		entry, ok := e.(map[string]any)
+		if !ok {
+			continue
+		}
+		url, _ := entry["webpage_url"].(string)
+		if url != "" {
+			urls = append(urls, url)
+		}
+	}
+
+	return urls, nil
+}
+
+func DownloadPlaylist(urls []string, player *VoicePlayer, discord *discordgo.Session, message *discordgo.MessageCreate) {
+	go func() {
+		for i, url := range urls {
+			song, err := DownlaodMusicFromLink(url)
+			if err != nil {
+				discord.ChannelMessageSend(message.ChannelID, fmt.Sprintf("Failed to download: %s", song.Title))
+				continue
+			}
+
+			// If it's the first track and nothing is playing → start
+			if i == 0 && !player.Playing {
+				go PlayMusic(player, song, discord, message)
+			} else {
+				// just enqueue the song
+				player.Queue = append(player.Queue, song)
+			}
+		}
+	}()
+}
+
 func showQueue(player *VoicePlayer) string {
 	if len(player.Queue) == 0 {
 		return "Queue is empty."
@@ -433,6 +516,30 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 
 		if _, ok := voiceConnections[vs.GuildID]; !ok {
 			JoinServer(discord, message)
+		}
+
+		isPl, _ := IsPlaylist(query)
+		if isPl {
+			fmt.Println("playlist detected")
+			urls, err := FetchPlaylistEntries(query)
+			if err != nil {
+				discord.ChannelMessageSend(message.ChannelID, "Failed to fetch playlist entries: "+err.Error())
+				return
+			}
+
+			player, ok := players[vs.GuildID]
+			if !ok {
+				player = &VoicePlayer{
+					VC:          voiceConnections[vs.GuildID],
+					Queue:       []Song{},
+					AutoAdvance: true,
+				}
+				players[vs.GuildID] = player
+			}
+
+			discord.ChannelMessageSend(message.ChannelID, fmt.Sprintf("Playlist detected with %d songs. Starting download...", len(urls)))
+			DownloadPlaylist(urls, player, discord, message)
+			return
 		}
 
 		// Download song (either by search or link)
