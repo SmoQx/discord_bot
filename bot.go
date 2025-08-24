@@ -16,7 +16,6 @@ import (
 	"layeh.com/gopus"
 )
 
-var BotToken string
 var voiceConnections = make(map[string]*discordgo.VoiceConnection)
 
 type Config struct {
@@ -58,8 +57,8 @@ func findUserVoiceState(s *discordgo.Session, guildID, userID string) (*discordg
 	return nil, fmt.Errorf("user not in a voice channel")
 }
 
-func Run() {
-	discord, err := discordgo.New("Bot " + BotToken)
+func Run(token string) {
+	discord, err := discordgo.New("Bot " + token)
 	checkNilErr(err)
 
 	discord.AddHandler(newMessage)
@@ -595,7 +594,7 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 
 func main() {
 
-	bytes, err := os.ReadFile("config.json") // replaces ioutil.ReadFile
+	bytes, err := os.ReadFile("conf.json") // replaces ioutil.ReadFile
 	if err != nil {
 		log.Fatal("Error reading file:", err)
 	}
@@ -606,7 +605,5 @@ func main() {
 		log.Fatal("Error decoding JSON:", err)
 	}
 
-	BotToken = config.BotToken
-
-	Run()
+	Run(config.BotToken)
 }
