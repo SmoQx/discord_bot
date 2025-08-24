@@ -19,6 +19,10 @@ import (
 var BotToken string
 var voiceConnections = make(map[string]*discordgo.VoiceConnection)
 
+type Config struct {
+	BotToken string
+}
+
 type Song struct {
 	Title    string
 	Filename string
@@ -590,5 +594,19 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 }
 
 func main() {
+
+	bytes, err := os.ReadFile("config.json") // replaces ioutil.ReadFile
+	if err != nil {
+		log.Fatal("Error reading file:", err)
+	}
+
+	// Unmarshal JSON
+	var config Config
+	if err := json.Unmarshal(bytes, &config); err != nil {
+		log.Fatal("Error decoding JSON:", err)
+	}
+
+	BotToken = config.BotToken
+
 	Run()
 }
