@@ -234,8 +234,8 @@ func IsPlaying(guildID string) bool {
 }
 
 func CheckIfCachedMusic(filepath string) bool {
-	if _, err := os.Stat(filepath); err == nil {
-		fmt.Println("File already exists in cache:", filepath)
+	if _, err := os.Stat("./cache/" + filepath); err == nil {
+		fmt.Println("File already exists in cache:", "./cache/"+filepath)
 		return true
 	} else if os.IsNotExist(err) {
 		return false
@@ -337,7 +337,8 @@ func GetVideoIDFromLink(link string) (Song, error) {
 
 	dl := ytdlp.New().
 		PrintJSON().
-		NoProgress()
+		NoProgress().
+		SkipDownload()
 
 	r, err := dl.Run(context.TODO(), link)
 	if err != nil {
@@ -365,7 +366,8 @@ func GetVideoIDFromQuerry(query string) (Song, error) {
 
 	dl := ytdlp.New().
 		PrintJSON().
-		NoProgress()
+		NoProgress().
+		SkipDownload()
 
 	r, err := dl.Run(context.TODO(), searchQuery)
 	if err != nil {
@@ -391,20 +393,30 @@ func IsPlaylist(link string) (bool, error) {
 
 	dl := ytdlp.New().
 		PrintJSON().
-		LazyPlaylist() // ✅ only fetch high-level info, not all videos
+		SkipDownload()
 
 	r, err := dl.Run(context.TODO(), link)
 	if err != nil {
 		return false, err
 	}
 
-	var data map[string]interface{}
-	if err := json.Unmarshal([]byte(r.Stdout), &data); err != nil {
-		return false, err
+	var entries []map[string]interface{}
+	// var data map[string]any
+	lines := strings.Split(r.Stdout, "\n")
+	for _, line := range lines {
+		if len(strings.TrimSpace(line)) == 0 {
+			continue
+		}
+		var entry map[string]interface{}
+		if err := json.Unmarshal([]byte(line), &entry); err != nil {
+			fmt.Println("Error unmarshalling line:", err)
+			continue
+		}
+		fmt.Println("Entry title:", entry["title"])
+		entries = append(entries, entry)
 	}
 
-	// If "entries" key exists → it's a playlist
-	if _, ok := data["entries"]; ok {
+	if len(entries) > 1 {
 		return true, nil
 	}
 
@@ -417,34 +429,39 @@ func FetchPlaylistEntries(link string) ([]string, error) {
 	r, err := ytdlp.New().
 		PrintJSON().
 		DumpSingleJSON().
+		SkipDownload().
 		Run(context.TODO(), link)
+
 	if err != nil {
 		return nil, err
 	}
 
-	var data map[string]any
-	if err := json.Unmarshal([]byte(r.Stdout), &data); err != nil {
-		return nil, err
-	}
-
-	entries, ok := data["entries"].([]any)
-	if !ok {
-		return nil, fmt.Errorf("not a playlist or missing entries")
-	}
-
-	urls := make([]string, 0, len(entries))
-	for _, e := range entries {
-		entry, ok := e.(map[string]any)
-		if !ok {
+	// var entries []map[string]interface{}
+	var urls []string
+	lines := strings.Split(r.Stdout, "\n")
+	for _, line := range lines {
+		if len(strings.TrimSpace(line)) == 0 {
 			continue
 		}
-		url, _ := entry["webpage_url"].(string)
-		if url != "" {
-			urls = append(urls, url)
+		var entry map[string]interface{}
+		if err := json.Unmarshal([]byte(line), &entry); err != nil {
+			fmt.Println("Error unmarshalling line:", err)
+			continue
+		}
+		fmt.Println("Entry title:", entry["title"])
+
+		// Safe type assertion
+		if urlVal, ok := entry["webpage_url"].(string); ok && urlVal != "" {
+			urls = append(urls, urlVal)
+			fmt.Println("Entry URL:", urlVal)
+		} else {
+			fmt.Println("Entry missing URL, skipping")
 		}
 	}
 
-	return urls, nil
+	fmt.Println("All URLs:", urls)
+
+	return urls[:len(urls)-1], nil
 }
 
 func DownloadPlaylist(urls []string, player *VoicePlayer, discord *discordgo.Session, message *discordgo.MessageCreate) {
@@ -452,6 +469,7 @@ func DownloadPlaylist(urls []string, player *VoicePlayer, discord *discordgo.Ses
 		for i, url := range urls {
 			song, err := DownlaodMusicFromLink(url)
 			if err != nil {
+				fmt.Println("Failed to download a playlist entry")
 				discord.ChannelMessageSend(message.ChannelID, fmt.Sprintf("Failed to download: %s", song.Title))
 				continue
 			}
@@ -521,9 +539,10 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 			JoinServer(discord, message)
 		}
 
-		isPl, _ := IsPlaylist(query)
+		isPl, playlist_error := IsPlaylist(query)
+		fmt.Println(playlist_error)
 		if isPl {
-			fmt.Println("playlist detected")
+			fmt.Println("Playlist detected")
 			urls, err := FetchPlaylistEntries(query)
 			if err != nil {
 				discord.ChannelMessageSend(message.ChannelID, "Failed to fetch playlist entries: "+err.Error())
