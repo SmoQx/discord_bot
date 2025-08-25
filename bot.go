@@ -121,7 +121,8 @@ func PrintHelp(discord *discordgo.Session, message *discordgo.MessageCreate) {
 !skip - skips current song
 !stop - stops the bot
 !leave - bot leaves
-!help - showes this message`
+!help - showes this message
+!stats - for servers songs statistics`
 	discord.ChannelMessageSend(message.ChannelID, message_text)
 }
 
@@ -508,10 +509,11 @@ func showQueue(player *VoicePlayer) string {
 func ShowPlayStats(discord *discordgo.Session, message *discordgo.MessageCreate, db *sql.DB) {
 	var songs []crud.Song_counter
 	var err error
-	songs, err = crud.ReadAllPlayedCountForSong(db)
+	songs, err = crud.ReadAllPlayedCountForSongInServer(message.GuildID, db)
 	if err != nil {
 		fmt.Println("Error while reading from database :", err)
 	}
+	fmt.Println(songs)
 
 	var sb strings.Builder
 	sb.WriteString("Songs statistics are:\n")
@@ -616,8 +618,8 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate, db
 				}
 			}
 		}
-		crud.InsertSongIntoDatabase(song.Filename, song.Title, db)
-		crud.UpdateSongsPlayCount(song.Filename, db)
+		crud.InsertSongIntoDatabase(song.Filename, song.Title, message.GuildID, db)
+		crud.UpdateSongsPlayCount(song.Filename, message.GuildID, db)
 		if err != nil {
 			discord.ChannelMessageSend(message.ChannelID, "Failed to download: "+err.Error())
 			return

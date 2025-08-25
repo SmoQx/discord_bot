@@ -15,6 +15,7 @@ type User struct {
 type Song_counter struct {
 	Id             string
 	Title          string
+	Server         string
 	Played_counter int
 }
 
@@ -31,6 +32,7 @@ func InitDatabase(db *sql.DB) {
 	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS songs (
 		id TEXT PRIMARY KEY,
 		title TEXT,
+		server TEXT,
 		played_counter INTEGER
 	);`)
 
@@ -49,17 +51,17 @@ func InsertUserIntoDatabase(username string, user_id string, db *sql.DB) error {
 	return err
 }
 
-func InsertSongIntoDatabase(song_id string, song_title string, db *sql.DB) error {
+func InsertSongIntoDatabase(song_id string, song_title string, server string, db *sql.DB) error {
 	if song_id == "" || song_title == "" {
-		return fmt.Errorf("Username is empyt")
+		return fmt.Errorf("Username is empty")
 	}
-	_, err := db.Exec(`INSERT INTO songs (id, title, played_counter) VALUES (?, ?, 0)`, song_id, song_title)
+	_, err := db.Exec(`INSERT INTO songs (id, title, played_counter, server) VALUES (?, ?, 0, ?)`, song_id, song_title, server)
 
 	return err
 }
 
-func UpdateSongsPlayCount(song_id string, db *sql.DB) {
-	_, err := db.Exec("UPDATE songs SET played_counter = played_counter + 1 WHERE id = ?", song_id)
+func UpdateSongsPlayCount(song_id string, server string, db *sql.DB) {
+	_, err := db.Exec("UPDATE songs SET played_counter = played_counter + 1 WHERE id = ? and server = ?", song_id, server)
 	if err != nil {
 		fmt.Println("Update:", err)
 	}
@@ -100,6 +102,28 @@ func ReadAllPlayedCountForSong(db *sql.DB) ([]Song_counter, error) {
 			fmt.Println(err)
 		}
 		fmt.Printf("song_title: %s, played_counter: %d\n", song.Title, song.Played_counter)
+		songs = append(songs, song)
+	}
+	return songs, nil
+}
+
+func ReadAllPlayedCountForSongInServer(server_name string, db *sql.DB) ([]Song_counter, error) {
+	rows, err := db.Query("SELECT title, played_counter FROM songs WHERE server = ?", server_name)
+	if err != nil {
+		fmt.Println("Select:", err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	var songs []Song_counter
+	for rows.Next() {
+		var song Song_counter
+		err = rows.Scan(&song.Title, &song.Played_counter)
+		if err != nil {
+			fmt.Println(err)
+		}
+		fmt.Printf("song_title: %s, played_counter: %d\n", song.Title, song.Played_counter)
+		songs = append(songs, song)
 	}
 	return songs, nil
 }
@@ -137,14 +161,14 @@ func Test() {
 
 	InitDatabase(db)
 
-	InsertSongIntoDatabase("1", "first_song", db)
-	InsertSongIntoDatabase("1", "first_song", db)
-	InsertSongIntoDatabase("2", "second", db)
-	InsertSongIntoDatabase("3", "third", db)
+	InsertSongIntoDatabase("1", "first_song", "1", db)
+	InsertSongIntoDatabase("1", "first_song", "1", db)
+	InsertSongIntoDatabase("2", "second", "1", db)
+	InsertSongIntoDatabase("3", "third", "1", db)
 	InsertUserIntoDatabase("asdf", "1", db)
 	InsertUserIntoDatabase("asdf", "1", db)
 	InsertUserIntoDatabase("afdfds", "2", db)
-	UpdateSongsPlayCount("1", db)
+	UpdateSongsPlayCount("1", "1", db)
 
 	fmt.Println("Users:")
 	_, err = ReadAllUsers(db)
