@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"sort"
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
@@ -772,6 +773,10 @@ func ShowPlayStatsForInteraction(discord *discordgo.Session, message *discordgo.
 		fmt.Println("Error while reading from database :", err)
 	}
 	fmt.Println(songs)
+
+	sort.Slice(songs, func(i, j int) bool {
+		return songs[i].Played_counter > songs[j].Played_counter
+	})
 
 	var sb strings.Builder
 	sb.WriteString("Songs statistics are:\n")

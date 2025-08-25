@@ -87,7 +87,7 @@ func ReadPlayedCountForSong(song_id string, db *sql.DB) ([]Song_counter, error) 
 }
 
 func ReadAllPlayedCountForSong(db *sql.DB) ([]Song_counter, error) {
-	rows, err := db.Query("SELECT title, played_counter FROM songs ORDER BY played_counter DESC")
+	rows, err := db.Query("select s.title, s.played_counter  from songs s order by s.played_counter desc")
 	if err != nil {
 		fmt.Println("Select:", err)
 		return nil, err
