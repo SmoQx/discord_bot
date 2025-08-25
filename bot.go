@@ -63,9 +63,9 @@ func Run(token string, db *sql.DB) {
 	discord, err := discordgo.New("Bot " + token)
 	checkNilErr(err)
 
-	discord.AddHandler(func(s *discordgo.Session, m *discordgo.MessageCreate) {
-		newMessage(s, m, db) // pass db yourself
-	})
+	// discord.AddHandler(func(s *discordgo.Session, m *discordgo.MessageCreate) {
+	// 	newMessage(s, m, db) // pass db yourself
+	// })
 
 	discord.AddHandler(voiceStateUpdate)
 
@@ -77,10 +77,6 @@ func Run(token string, db *sql.DB) {
 	defer discord.Close()
 
 	commands := []*discordgo.ApplicationCommand{
-		{
-			Name:        "asdf",
-			Description: "Replies with Pong!",
-		},
 		{
 			Name:        "play",
 			Description: "Play a song from a link or search query",
@@ -94,13 +90,37 @@ func Run(token string, db *sql.DB) {
 			},
 		},
 		{
+			Name:        "join",
+			Description: "Join the server",
+		},
+		{
 			Name:        "stop",
 			Description: "Stop playback and clear the queue",
+		},
+		{
+			Name:        "leave",
+			Description: "Stop playback, clear the queue and leave",
+		},
+		{
+			Name:        "stats",
+			Description: "Server music stats",
+		},
+		{
+			Name:        "help",
+			Description: "Shows all commands which are avaiable on this server",
+		},
+		{
+			Name:        "queue",
+			Description: "Shows current queue",
+		},
+		{
+			Name:        "skip",
+			Description: "Skips currently playing song",
 		},
 	}
 
 	for _, cmd := range commands {
-		_, err := discord.ApplicationCommandCreate(discord.State.User.ID, DevGuildID, cmd)
+		_, err := discord.ApplicationCommandCreate(discord.State.User.ID, "", cmd)
 		if err != nil {
 			log.Fatalf("Cannot create '%v' command: %v", cmd.Name, err)
 		}
@@ -180,24 +200,43 @@ func JoinServer(discord *discordgo.Session, message *discordgo.MessageCreate) {
 	discord.ChannelMessageSend(message.ChannelID, "Joined your voice channel!")
 }
 
-func JoinServerFromCommand(discord *discordgo.Session, message *discordgo.InteractionCreate) {
+func JoinServerFromCommand(discord *discordgo.Session, i *discordgo.InteractionCreate) {
 	// Find the voice state for the user in the guild
-	vs, err := findUserVoiceState(discord, message.GuildID, message.User.ID)
+	vs, err := findUserVoiceState(discord, i.GuildID, i.Member.User.ID)
 	if err != nil {
-		discord.ChannelMessageSend(message.ChannelID, "You must be in a voice channel first!")
+		discord.FollowupMessageCreate(i.Interaction, false, &discordgo.WebhookParams{
+			Content: "You must be in a voice channel first!",
+		})
 		return
 	}
 
 	// Connect to that voice channel
-	vc, err := discord.ChannelVoiceJoin(message.GuildID, vs.ChannelID, false, true)
+	vc, err := discord.ChannelVoiceJoin(i.GuildID, vs.ChannelID, false, true)
 	if err != nil {
-		discord.ChannelMessageSend(message.ChannelID, "Failed to join voice channel.")
+		discord.FollowupMessageCreate(i.Interaction, false, &discordgo.WebhookParams{
+			Content: "Failed to join voice channel.",
+		})
 		fmt.Println("Error joining voice channel:", err)
 		return
 	}
 
-	voiceConnections[message.GuildID] = vc
-	discord.ChannelMessageSend(message.ChannelID, "Joined your voice channel!")
+	voiceConnections[i.GuildID] = vc
+	discord.ChannelMessageSend(i.ChannelID, "Joined your voice channel!")
+}
+
+func LeaveServerForInteraction(discord *discordgo.Session, i *discordgo.InteractionCreate) {
+	if vc, ok := discord.VoiceConnections[i.GuildID]; ok {
+		vc.Disconnect()
+		delete(voiceConnections, vc.GuildID)
+		delete(players, vc.GuildID)
+		discord.FollowupMessageCreate(i.Interaction, false, &discordgo.WebhookParams{
+			Content: "Leaveing the voice channel",
+		})
+	} else {
+		discord.FollowupMessageCreate(i.Interaction, false, &discordgo.WebhookParams{
+			Content: "I'm not in a voice channel",
+		})
+	}
 }
 
 func LeaveServer(discord *discordgo.Session, message *discordgo.MessageCreate) {
@@ -217,11 +256,8 @@ func PlayMusicFromInteraction(player *VoicePlayer, song Song, discord *discordgo
 	player.AutoAdvance = true
 
 	vc := player.VC
-	discord.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-		Type: discordgo.InteractionResponseChannelMessageWithSource,
-		Data: &discordgo.InteractionResponseData{
-			Content: "Now playing: **" + song.Title + "**",
-		},
+	discord.FollowupMessageCreate(i.Interaction, false, &discordgo.WebhookParams{
+		Content: "Now playing: **" + song.Title + "**",
 	})
 
 	vc.Speaking(true)
@@ -231,21 +267,15 @@ func PlayMusicFromInteraction(player *VoicePlayer, song Song, discord *discordgo
 	ffmpegOut, err := ffmpeg.StdoutPipe()
 	if err != nil {
 		fmt.Println("ffmpeg StdoutPipe error:", err)
-		discord.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-			Type: discordgo.InteractionResponseChannelMessageWithSource,
-			Data: &discordgo.InteractionResponseData{
-				Content: "Error starting audio pipeline.",
-			},
+		discord.FollowupMessageCreate(i.Interaction, false, &discordgo.WebhookParams{
+			Content: "Error starting audio pipeline.",
 		})
 		return
 	}
 	if err := ffmpeg.Start(); err != nil {
 		fmt.Println("Error starting ffmpeg:", err)
-		discord.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-			Type: discordgo.InteractionResponseChannelMessageWithSource,
-			Data: &discordgo.InteractionResponseData{
-				Content: "Error starting ffmpeg.",
-			},
+		discord.FollowupMessageCreate(i.Interaction, false, &discordgo.WebhookParams{
+			Content: "Error starting ffmpeg.",
 		})
 		return
 	}
@@ -278,11 +308,8 @@ func PlayMusicFromInteraction(player *VoicePlayer, song Song, discord *discordgo
 	} else if !player.AutoAdvance {
 		// skip/stop handled the next step explicitly
 	} else {
-		discord.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-			Type: discordgo.InteractionResponseChannelMessageWithSource,
-			Data: &discordgo.InteractionResponseData{
-				Content: "Queue finished.",
-			},
+		discord.FollowupMessageCreate(i.Interaction, false, &discordgo.WebhookParams{
+			Content: "Queue finished.",
 		})
 	}
 }
@@ -341,6 +368,30 @@ func PlayMusic(player *VoicePlayer, song Song, discord *discordgo.Session, messa
 	} else {
 		discord.ChannelMessageSend(message.ChannelID, "Queue finished.")
 	}
+}
+
+func StopMusicForInteraction(vc *discordgo.VoiceConnection, discord *discordgo.Session, interaction *discordgo.InteractionCreate) {
+	player, ok := players[vc.GuildID]
+	if !ok || !player.Playing {
+		discord.FollowupMessageCreate(interaction.Interaction, false, &discordgo.WebhookParams{
+			Content: "No music is currently playing.",
+		})
+		return
+	}
+
+	player.AutoAdvance = false
+	player.Playing = false
+
+	if player.FFmpegCmd != nil {
+		_ = player.FFmpegCmd.Process.Kill()
+		player.FFmpegCmd = nil
+	}
+
+	player.Queue = []Song{}
+	vc.Speaking(false)
+	discord.FollowupMessageCreate(interaction.Interaction, false, &discordgo.WebhookParams{
+		Content: "Stopped playback and cleared the queue.",
+	})
 }
 
 func StopMusic(vc *discordgo.VoiceConnection, discord *discordgo.Session, message *discordgo.MessageCreate) {
@@ -608,11 +659,8 @@ func DownloadPlaylistFromInteractoin(urls []string, player *VoicePlayer, discord
 			song, err := DownlaodMusicFromLink(url)
 			if err != nil {
 				fmt.Println("Failed to download a playlist entry")
-				discord.InteractionRespond(interaction.Interaction, &discordgo.InteractionResponse{
-					Type: discordgo.InteractionResponseChannelMessageWithSource,
-					Data: &discordgo.InteractionResponseData{
-						Content: fmt.Sprintf("Failed to download: %s", song.Title),
-					},
+				discord.FollowupMessageCreate(interaction.Interaction, false, &discordgo.WebhookParams{
+					Content: fmt.Sprintf("Failed to download: %s", song.Title),
 				})
 				continue
 			}
@@ -662,6 +710,32 @@ func showQueue(player *VoicePlayer) string {
 	return strings.Join(titles, "\n") // join titles with newlines
 }
 
+func ShowPlayStatsForInteraction(discord *discordgo.Session, message *discordgo.InteractionCreate, db *sql.DB) {
+	var songs []crud.Song_counter
+	var err error
+	songs, err = crud.ReadAllPlayedCountForSongInServer(message.GuildID, db)
+	if err != nil {
+		fmt.Println("Error while reading from database :", err)
+	}
+	fmt.Println(songs)
+
+	var sb strings.Builder
+	sb.WriteString("Songs statistics are:\n")
+
+	for _, song := range songs {
+		sb.WriteString(fmt.Sprintf("Song title %s was played %d\n", song.Title, song.Played_counter))
+		fmt.Println(song.Title, song.Played_counter)
+	}
+	sb.WriteString("Thats it folks")
+
+	result := sb.String()
+	fmt.Println(result)
+
+	discord.FollowupMessageCreate(message.Interaction, false, &discordgo.WebhookParams{
+		Content: result,
+	})
+}
+
 func ShowPlayStats(discord *discordgo.Session, message *discordgo.MessageCreate, db *sql.DB) {
 	var songs []crud.Song_counter
 	var err error
@@ -687,23 +761,91 @@ func ShowPlayStats(discord *discordgo.Session, message *discordgo.MessageCreate,
 }
 
 func newCommand(discord *discordgo.Session, i *discordgo.InteractionCreate, db *sql.DB) {
-	user_id := i.User.ID
-	username := i.User.Username
+	user_id := i.Member.User.ID
+	username := i.Member.User.Username
 	crud.InsertUserIntoDatabase(username, user_id, db)
 	if i.Type == discordgo.InteractionApplicationCommand {
 		switch i.ApplicationCommandData().Name {
-		case "asdf":
+		case "help":
+			message_text := `This message is shown when you need help:
+!queue - list ququeue
+!join - bot joins
+!skip - skips current song
+!stop - stops the bot
+!leave - bot leaves
+!help - showes this message
+!stats - for servers songs statistics`
 			discord.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 				Type: discordgo.InteractionResponseChannelMessageWithSource,
 				Data: &discordgo.InteractionResponseData{
-					Content: "Pong!",
+					Content: message_text,
 				},
 			})
+		case "queue":
+			vs, err := findUserVoiceState(discord, i.GuildID, i.Member.User.ID)
+			if err != nil {
+				return
+			}
+			player, ok := players[vs.GuildID]
+			if !ok {
+				discord.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+					Type: discordgo.InteractionResponseChannelMessageWithSource,
+					Data: &discordgo.InteractionResponseData{
+						Content: "Current playlist is empty",
+					},
+				})
+				return
+			}
+			discord.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: "Current playlist" + showQueue(player),
+				},
+			})
+		case "stats":
+			discord.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: "Current statistics:",
+				},
+			})
+			ShowPlayStatsForInteraction(discord, i, db)
+		case "stop":
+			discord.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: "Stoping!",
+				},
+			})
+			StopMusicForInteraction(voiceConnections[i.GuildID], discord, i)
+		case "leave":
+			discord.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: "Leave Server!",
+				},
+			})
+			StopMusicForInteraction(voiceConnections[i.GuildID], discord, i)
+			LeaveServerForInteraction(discord, i)
+		case "join":
+			discord.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: "Joining the server",
+				},
+			})
+			JoinServerFromCommand(discord, i)
 		case "play":
+			discord.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: "I will start the music soon ",
+				},
+			})
 			query := i.ApplicationCommandData().Options[0].StringValue()
 			// here you can call your existing !play logic, reusing PlayMusic
 
-			vs, err := findUserVoiceState(discord, i.GuildID, i.User.ID)
+			vs, err := findUserVoiceState(discord, i.GuildID, i.Member.User.ID)
 
 			if _, ok := voiceConnections[vs.GuildID]; !ok {
 				JoinServerFromCommand(discord, i)
@@ -714,19 +856,12 @@ func newCommand(discord *discordgo.Session, i *discordgo.InteractionCreate, db *
 			if !strings.Contains(query, "http") {
 				song, err = GetVideoIDFromQuerry(query)
 				if !CheckIfCachedMusic(song.Filename) {
-
-					discord.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-						Type: discordgo.InteractionResponseChannelMessageWithSource,
-						Data: &discordgo.InteractionResponseData{
-							Content: "Downloading started",
-						},
+					discord.FollowupMessageCreate(i.Interaction, false, &discordgo.WebhookParams{
+						Content: "Downloading started",
 					})
 					song, err = DownlaodMusicFromQuerry(query)
-					discord.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-						Type: discordgo.InteractionResponseChannelMessageWithSource,
-						Data: &discordgo.InteractionResponseData{
-							Content: "Downloaded" + song.Title,
-						},
+					discord.FollowupMessageCreate(i.Interaction, false, &discordgo.WebhookParams{
+						Content: "Downloaded" + song.Title,
 					})
 				}
 			} else if strings.Contains(query, "http") {
@@ -736,11 +871,8 @@ func newCommand(discord *discordgo.Session, i *discordgo.InteractionCreate, db *
 					fmt.Println("Playlist detected")
 					urls, err := FetchPlaylistEntries(query)
 					if err != nil {
-						discord.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-							Type: discordgo.InteractionResponseChannelMessageWithSource,
-							Data: &discordgo.InteractionResponseData{
-								Content: "Failed to fetch playlist entries: " + err.Error(),
-							},
+						discord.FollowupMessageCreate(i.Interaction, false, &discordgo.WebhookParams{
+							Content: "Failed to fetch playlist entries: " + err.Error(),
 						})
 						return
 					}
@@ -755,29 +887,20 @@ func newCommand(discord *discordgo.Session, i *discordgo.InteractionCreate, db *
 						players[vs.GuildID] = player
 					}
 
-					discord.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-						Type: discordgo.InteractionResponseChannelMessageWithSource,
-						Data: &discordgo.InteractionResponseData{
-							Content: fmt.Sprintf("Playlist detected with %d songs. Starting download...", len(urls)),
-						},
+					discord.FollowupMessageCreate(i.Interaction, false, &discordgo.WebhookParams{
+						Content: fmt.Sprintf("Playlist detected with %d songs. Starting download...", len(urls)),
 					})
 					DownloadPlaylistFromInteractoin(urls, player, discord, i)
 					return
 				} else {
 					song, err = GetVideoIDFromLink(query)
 					if !CheckIfCachedMusic(song.Filename) {
-						discord.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-							Type: discordgo.InteractionResponseChannelMessageWithSource,
-							Data: &discordgo.InteractionResponseData{
-								Content: "Downloading started",
-							},
+						discord.FollowupMessageCreate(i.Interaction, false, &discordgo.WebhookParams{
+							Content: "Downloading started",
 						})
 						song, err = DownlaodMusicFromLink(query)
-						discord.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-							Type: discordgo.InteractionResponseChannelMessageWithSource,
-							Data: &discordgo.InteractionResponseData{
-								Content: "Downloaded" + song.Title,
-							},
+						discord.FollowupMessageCreate(i.Interaction, false, &discordgo.WebhookParams{
+							Content: "Downloaded" + song.Title,
 						})
 					}
 				}
@@ -785,11 +908,8 @@ func newCommand(discord *discordgo.Session, i *discordgo.InteractionCreate, db *
 			crud.InsertSongIntoDatabase(song.Filename, song.Title, i.GuildID, db)
 			crud.UpdateSongsPlayCount(song.Filename, i.GuildID, db)
 			if err != nil {
-				discord.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-					Type: discordgo.InteractionResponseChannelMessageWithSource,
-					Data: &discordgo.InteractionResponseData{
-						Content: "Failed to download: " + err.Error(),
-					},
+				discord.FollowupMessageCreate(i.Interaction, false, &discordgo.WebhookParams{
+					Content: "Failed to download: " + err.Error(),
 				})
 				return
 			}
@@ -807,11 +927,8 @@ func newCommand(discord *discordgo.Session, i *discordgo.InteractionCreate, db *
 			// If playing, add to queue, otherwise play immediately
 			if player.Playing {
 				player.Queue = append(player.Queue, song)
-				discord.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-					Type: discordgo.InteractionResponseChannelMessageWithSource,
-					Data: &discordgo.InteractionResponseData{
-						Content: "Added to queue: **" + song.Title + "**",
-					},
+				discord.FollowupMessageCreate(i.Interaction, false, &discordgo.WebhookParams{
+					Content: "Added to queue: **" + song.Title + "**",
 				})
 			} else {
 				go PlayMusicFromInteraction(player, song, discord, i)
