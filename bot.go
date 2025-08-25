@@ -280,6 +280,16 @@ func PlayMusicFromInteraction(player *VoicePlayer, song Song, discord *discordgo
 		return
 	}
 
+	discord.UpdateStatusComplex(discordgo.UpdateStatusData{
+		Status: "online",
+		Activities: []*discordgo.Activity{
+			{
+				Name: song.Title,
+				Type: discordgo.ActivityTypeListening,
+			},
+		},
+	})
+
 	encoder, _ := gopus.NewEncoder(48000, 2, gopus.Audio)
 	pcm := make([]int16, 960*2) // 20ms stereo
 
@@ -308,6 +318,10 @@ func PlayMusicFromInteraction(player *VoicePlayer, song Song, discord *discordgo
 	} else if !player.AutoAdvance {
 		// skip/stop handled the next step explicitly
 	} else {
+		discord.UpdateStatusComplex(discordgo.UpdateStatusData{
+			Status:     "online",
+			Activities: []*discordgo.Activity{},
+		})
 		discord.FollowupMessageCreate(i.Interaction, false, &discordgo.WebhookParams{
 			Content: "Queue finished.",
 		})
@@ -495,6 +509,46 @@ func DownlaodMusicFromQuerry(querry string) (Song, error) {
 	}, nil
 }
 
+func SkipMusicForInteraction(vc *discordgo.VoiceConnection, discord *discordgo.Session, message *discordgo.InteractionCreate) {
+	player, ok := players[vc.GuildID]
+	if !ok || !player.Playing {
+		discord.InteractionRespond(message.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: "No music is currently playing.",
+			},
+		})
+		return
+	}
+
+	// Prevent the current PlayMusic from auto-advancing
+	player.AutoAdvance = false
+	player.Playing = false
+
+	if player.FFmpegCmd != nil {
+		_ = player.FFmpegCmd.Process.Kill()
+		player.FFmpegCmd = nil
+	}
+
+	if len(player.Queue) > 0 {
+		next := player.Queue[0]
+		player.Queue = player.Queue[1:]
+		discord.InteractionRespond(message.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: "Skipping… Now playing: **" + next.Title + "**",
+			},
+		})
+		go PlayMusicFromInteraction(player, next, discord, message) // this new PlayMusic will reset AutoAdvance=true
+	} else {
+		discord.InteractionRespond(message.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: "Skipped. No more songs in the queue.",
+			},
+		})
+	}
+}
 func SkipMusic(vc *discordgo.VoiceConnection, discord *discordgo.Session, message *discordgo.MessageCreate) {
 	player, ok := players[vc.GuildID]
 	if !ok || !player.Playing {
@@ -723,7 +777,7 @@ func ShowPlayStatsForInteraction(discord *discordgo.Session, message *discordgo.
 	sb.WriteString("Songs statistics are:\n")
 
 	for _, song := range songs {
-		sb.WriteString(fmt.Sprintf("Song title %s was played %d\n", song.Title, song.Played_counter))
+		sb.WriteString(fmt.Sprintf("Song title %s was played ** %d **\n", song.Title, song.Played_counter))
 		fmt.Println(song.Title, song.Played_counter)
 	}
 	sb.WriteString("Thats it folks")
@@ -793,7 +847,7 @@ func newCommand(discord *discordgo.Session, i *discordgo.InteractionCreate, db *
 			discord.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 				Type: discordgo.InteractionResponseChannelMessageWithSource,
 				Data: &discordgo.InteractionResponseData{
-					Content: "Current playlist " + showQueue(player),
+					Content: "Current playlist " + "**" + showQueue(player) + "**",
 				},
 			})
 		case "stats":
@@ -812,6 +866,17 @@ func newCommand(discord *discordgo.Session, i *discordgo.InteractionCreate, db *
 				},
 			})
 			StopMusicForInteraction(voiceConnections[i.GuildID], discord, i)
+		case "skip":
+			if vc, ok := voiceConnections[i.GuildID]; ok {
+				SkipMusicForInteraction(vc, discord, i)
+			} else {
+				discord.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+					Type: discordgo.InteractionResponseChannelMessageWithSource,
+					Data: &discordgo.InteractionResponseData{
+						Content: "I'm not in a voice channel.",
+					},
+				})
+			}
 		case "leave":
 			discord.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 				Type: discordgo.InteractionResponseChannelMessageWithSource,
