@@ -66,11 +66,45 @@ func Run(token string, db *sql.DB) {
 	discord.AddHandler(func(s *discordgo.Session, m *discordgo.MessageCreate) {
 		newMessage(s, m, db) // pass db yourself
 	})
+
 	discord.AddHandler(voiceStateUpdate)
 
+	discord.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		newCommand(s, i, db)
+	})
 	discord.Open()
+
 	defer discord.Close()
 
+	commands := []*discordgo.ApplicationCommand{
+		{
+			Name:        "asdf",
+			Description: "Replies with Pong!",
+		},
+		{
+			Name:        "play",
+			Description: "Play a song from a link or search query",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "query",
+					Description: "YouTube URL or search query",
+					Required:    true,
+				},
+			},
+		},
+		{
+			Name:        "stop",
+			Description: "Stop playback and clear the queue",
+		},
+	}
+
+	for _, cmd := range commands {
+		_, err := discord.ApplicationCommandCreate(discord.State.User.ID, DevGuildID, cmd)
+		if err != nil {
+			log.Fatalf("Cannot create '%v' command: %v", cmd.Name, err)
+		}
+	}
 	fmt.Println("Bot started")
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
@@ -146,6 +180,26 @@ func JoinServer(discord *discordgo.Session, message *discordgo.MessageCreate) {
 	discord.ChannelMessageSend(message.ChannelID, "Joined your voice channel!")
 }
 
+func JoinServerFromCommand(discord *discordgo.Session, message *discordgo.InteractionCreate) {
+	// Find the voice state for the user in the guild
+	vs, err := findUserVoiceState(discord, message.GuildID, message.User.ID)
+	if err != nil {
+		discord.ChannelMessageSend(message.ChannelID, "You must be in a voice channel first!")
+		return
+	}
+
+	// Connect to that voice channel
+	vc, err := discord.ChannelVoiceJoin(message.GuildID, vs.ChannelID, false, true)
+	if err != nil {
+		discord.ChannelMessageSend(message.ChannelID, "Failed to join voice channel.")
+		fmt.Println("Error joining voice channel:", err)
+		return
+	}
+
+	voiceConnections[message.GuildID] = vc
+	discord.ChannelMessageSend(message.ChannelID, "Joined your voice channel!")
+}
+
 func LeaveServer(discord *discordgo.Session, message *discordgo.MessageCreate) {
 	if vc, ok := discord.VoiceConnections[message.GuildID]; ok {
 		vc.Disconnect()
@@ -154,6 +208,82 @@ func LeaveServer(discord *discordgo.Session, message *discordgo.MessageCreate) {
 		discord.ChannelMessageSend(message.ChannelID, "Leaveing the voice channel")
 	} else {
 		discord.ChannelMessageSend(message.ChannelID, "I'm not in a voice channel")
+	}
+}
+
+func PlayMusicFromInteraction(player *VoicePlayer, song Song, discord *discordgo.Session, i *discordgo.InteractionCreate) {
+	// Start a fresh playback: allow auto-advance unless a skip/stop disables it
+	player.Playing = true
+	player.AutoAdvance = true
+
+	vc := player.VC
+	discord.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Content: "Now playing: **" + song.Title + "**",
+		},
+	})
+
+	vc.Speaking(true)
+	ffmpeg := exec.Command("ffmpeg", "-i", "./cache/"+song.Filename, "-f", "s16le", "-ar", "48000", "-ac", "2", "pipe:1")
+	player.FFmpegCmd = ffmpeg
+
+	ffmpegOut, err := ffmpeg.StdoutPipe()
+	if err != nil {
+		fmt.Println("ffmpeg StdoutPipe error:", err)
+		discord.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: "Error starting audio pipeline.",
+			},
+		})
+		return
+	}
+	if err := ffmpeg.Start(); err != nil {
+		fmt.Println("Error starting ffmpeg:", err)
+		discord.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: "Error starting ffmpeg.",
+			},
+		})
+		return
+	}
+
+	encoder, _ := gopus.NewEncoder(48000, 2, gopus.Audio)
+	pcm := make([]int16, 960*2) // 20ms stereo
+
+	for {
+		if err := binary.Read(ffmpegOut, binary.LittleEndian, pcm); err != nil {
+			break
+		}
+		opus, _ := encoder.Encode(pcm, 960, 960*2*2)
+		vc.OpusSend <- opus
+
+		if !player.Playing { // stop/skip requested
+			break
+		}
+	}
+
+	// Tear down this playback
+	_ = ffmpeg.Wait()
+	vc.Speaking(false)
+	player.FFmpegCmd = nil
+	player.Playing = false
+
+	if player.AutoAdvance && len(player.Queue) > 0 {
+		next := player.Queue[0]
+		player.Queue = player.Queue[1:]
+		go PlayMusicFromInteraction(player, next, discord, i)
+	} else if !player.AutoAdvance {
+		// skip/stop handled the next step explicitly
+	} else {
+		discord.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: "Queue finished.",
+			},
+		})
 	}
 }
 
@@ -472,6 +602,32 @@ func FetchPlaylistEntries(link string) ([]string, error) {
 	return urls[:len(urls)-1], nil
 }
 
+func DownloadPlaylistFromInteractoin(urls []string, player *VoicePlayer, discord *discordgo.Session, interaction *discordgo.InteractionCreate) {
+	go func() {
+		for i, url := range urls {
+			song, err := DownlaodMusicFromLink(url)
+			if err != nil {
+				fmt.Println("Failed to download a playlist entry")
+				discord.InteractionRespond(interaction.Interaction, &discordgo.InteractionResponse{
+					Type: discordgo.InteractionResponseChannelMessageWithSource,
+					Data: &discordgo.InteractionResponseData{
+						Content: fmt.Sprintf("Failed to download: %s", song.Title),
+					},
+				})
+				continue
+			}
+
+			// If it's the first track and nothing is playing → start
+			if i == 0 && !player.Playing {
+				go PlayMusicFromInteraction(player, song, discord, interaction)
+			} else {
+				// just enqueue the song
+				player.Queue = append(player.Queue, song)
+			}
+		}
+	}()
+}
+
 func DownloadPlaylist(urls []string, player *VoicePlayer, discord *discordgo.Session, message *discordgo.MessageCreate) {
 	go func() {
 		for i, url := range urls {
@@ -528,6 +684,140 @@ func ShowPlayStats(discord *discordgo.Session, message *discordgo.MessageCreate,
 	fmt.Println(result)
 
 	discord.ChannelMessageSend(message.ChannelID, result)
+}
+
+func newCommand(discord *discordgo.Session, i *discordgo.InteractionCreate, db *sql.DB) {
+	user_id := i.User.ID
+	username := i.User.Username
+	crud.InsertUserIntoDatabase(username, user_id, db)
+	if i.Type == discordgo.InteractionApplicationCommand {
+		switch i.ApplicationCommandData().Name {
+		case "asdf":
+			discord.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: "Pong!",
+				},
+			})
+		case "play":
+			query := i.ApplicationCommandData().Options[0].StringValue()
+			// here you can call your existing !play logic, reusing PlayMusic
+
+			vs, err := findUserVoiceState(discord, i.GuildID, i.User.ID)
+
+			if _, ok := voiceConnections[vs.GuildID]; !ok {
+				JoinServerFromCommand(discord, i)
+			}
+
+			// Download song (either by search or link)
+			var song Song
+			if !strings.Contains(query, "http") {
+				song, err = GetVideoIDFromQuerry(query)
+				if !CheckIfCachedMusic(song.Filename) {
+
+					discord.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+						Type: discordgo.InteractionResponseChannelMessageWithSource,
+						Data: &discordgo.InteractionResponseData{
+							Content: "Downloading started",
+						},
+					})
+					song, err = DownlaodMusicFromQuerry(query)
+					discord.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+						Type: discordgo.InteractionResponseChannelMessageWithSource,
+						Data: &discordgo.InteractionResponseData{
+							Content: "Downloaded" + song.Title,
+						},
+					})
+				}
+			} else if strings.Contains(query, "http") {
+				isPl, playlist_error := IsPlaylist(query)
+				fmt.Println(playlist_error)
+				if isPl {
+					fmt.Println("Playlist detected")
+					urls, err := FetchPlaylistEntries(query)
+					if err != nil {
+						discord.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+							Type: discordgo.InteractionResponseChannelMessageWithSource,
+							Data: &discordgo.InteractionResponseData{
+								Content: "Failed to fetch playlist entries: " + err.Error(),
+							},
+						})
+						return
+					}
+
+					player, ok := players[vs.GuildID]
+					if !ok {
+						player = &VoicePlayer{
+							VC:          voiceConnections[vs.GuildID],
+							Queue:       []Song{},
+							AutoAdvance: true,
+						}
+						players[vs.GuildID] = player
+					}
+
+					discord.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+						Type: discordgo.InteractionResponseChannelMessageWithSource,
+						Data: &discordgo.InteractionResponseData{
+							Content: fmt.Sprintf("Playlist detected with %d songs. Starting download...", len(urls)),
+						},
+					})
+					DownloadPlaylistFromInteractoin(urls, player, discord, i)
+					return
+				} else {
+					song, err = GetVideoIDFromLink(query)
+					if !CheckIfCachedMusic(song.Filename) {
+						discord.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+							Type: discordgo.InteractionResponseChannelMessageWithSource,
+							Data: &discordgo.InteractionResponseData{
+								Content: "Downloading started",
+							},
+						})
+						song, err = DownlaodMusicFromLink(query)
+						discord.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+							Type: discordgo.InteractionResponseChannelMessageWithSource,
+							Data: &discordgo.InteractionResponseData{
+								Content: "Downloaded" + song.Title,
+							},
+						})
+					}
+				}
+			}
+			crud.InsertSongIntoDatabase(song.Filename, song.Title, i.GuildID, db)
+			crud.UpdateSongsPlayCount(song.Filename, i.GuildID, db)
+			if err != nil {
+				discord.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+					Type: discordgo.InteractionResponseChannelMessageWithSource,
+					Data: &discordgo.InteractionResponseData{
+						Content: "Failed to download: " + err.Error(),
+					},
+				})
+				return
+			}
+
+			player, ok := players[vs.GuildID]
+			if !ok {
+				player = &VoicePlayer{
+					VC:          voiceConnections[vs.GuildID],
+					Queue:       []Song{},
+					AutoAdvance: true,
+				}
+				players[vs.GuildID] = player
+			}
+
+			// If playing, add to queue, otherwise play immediately
+			if player.Playing {
+				player.Queue = append(player.Queue, song)
+				discord.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+					Type: discordgo.InteractionResponseChannelMessageWithSource,
+					Data: &discordgo.InteractionResponseData{
+						Content: "Added to queue: **" + song.Title + "**",
+					},
+				})
+			} else {
+				go PlayMusicFromInteraction(player, song, discord, i)
+			}
+		}
+	}
 }
 
 func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate, db *sql.DB) {
