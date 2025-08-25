@@ -788,18 +788,12 @@ func newCommand(discord *discordgo.Session, i *discordgo.InteractionCreate, db *
 			}
 			player, ok := players[vs.GuildID]
 			if !ok {
-				discord.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-					Type: discordgo.InteractionResponseChannelMessageWithSource,
-					Data: &discordgo.InteractionResponseData{
-						Content: "Current playlist is empty",
-					},
-				})
 				return
 			}
 			discord.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 				Type: discordgo.InteractionResponseChannelMessageWithSource,
 				Data: &discordgo.InteractionResponseData{
-					Content: "Current playlist" + showQueue(player),
+					Content: "Current playlist " + showQueue(player),
 				},
 			})
 		case "stats":
