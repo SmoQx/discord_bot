@@ -234,10 +234,15 @@ func IsPlaying(guildID string) bool {
 }
 
 func CheckIfCachedMusic(filepath string) bool {
+	if filepath == "" {
+		fmt.Println("got an empty string")
+		return false
+	}
 	if _, err := os.Stat("./cache/" + filepath); err == nil {
 		fmt.Println("File already exists in cache:", "./cache/"+filepath)
 		return true
 	} else if os.IsNotExist(err) {
+		fmt.Println("File does not already exists in cache:", "./cache/"+filepath)
 		return false
 	} else {
 		fmt.Println("Error checking file:", err)
@@ -252,7 +257,6 @@ func DownlaodMusicFromLink(link string) (Song, error) {
 		PrintJSON().
 		NoPlaylist().
 		NoProgress().
-		FormatSort("bestaudio").
 		ExtractAudio().
 		AudioFormat("mp3").
 		Output("./cache/%(id)s.%(ext)s")
@@ -283,7 +287,6 @@ func DownlaodMusicFromQuerry(querry string) (Song, error) {
 		PrintJSON().
 		NoPlaylist().
 		NoProgress().
-		FormatSort("bestaudio").
 		ExtractAudio().
 		AudioFormat("mp3").
 		Output("./cache/%(id)s.%(ext)s")
@@ -539,34 +542,9 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 			JoinServer(discord, message)
 		}
 
-		isPl, playlist_error := IsPlaylist(query)
-		fmt.Println(playlist_error)
-		if isPl {
-			fmt.Println("Playlist detected")
-			urls, err := FetchPlaylistEntries(query)
-			if err != nil {
-				discord.ChannelMessageSend(message.ChannelID, "Failed to fetch playlist entries: "+err.Error())
-				return
-			}
-
-			player, ok := players[vs.GuildID]
-			if !ok {
-				player = &VoicePlayer{
-					VC:          voiceConnections[vs.GuildID],
-					Queue:       []Song{},
-					AutoAdvance: true,
-				}
-				players[vs.GuildID] = player
-			}
-
-			discord.ChannelMessageSend(message.ChannelID, fmt.Sprintf("Playlist detected with %d songs. Starting download...", len(urls)))
-			DownloadPlaylist(urls, player, discord, message)
-			return
-		}
-
 		// Download song (either by search or link)
 		var song Song
-		if len(parts) > 2 && !strings.Contains(query, "http") {
+		if len(parts) >= 2 && !strings.Contains(query, "http") {
 			song, err = GetVideoIDFromQuerry(query)
 			if !CheckIfCachedMusic(song.Filename) {
 				discord.ChannelMessageSend(message.ChannelID, "Downloading started")
@@ -574,11 +552,36 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 				discord.ChannelMessageSend(message.ChannelID, "Downloaded"+song.Title)
 			}
 		} else if len(parts) == 2 && strings.Contains(query, "http") {
-			song, err = GetVideoIDFromLink(query)
-			if !CheckIfCachedMusic(song.Filename) {
-				discord.ChannelMessageSend(message.ChannelID, "Downloading started")
-				song, err = DownlaodMusicFromLink(query)
-				discord.ChannelMessageSend(message.ChannelID, "Downloaded"+song.Title)
+			isPl, playlist_error := IsPlaylist(query)
+			fmt.Println(playlist_error)
+			if isPl {
+				fmt.Println("Playlist detected")
+				urls, err := FetchPlaylistEntries(query)
+				if err != nil {
+					discord.ChannelMessageSend(message.ChannelID, "Failed to fetch playlist entries: "+err.Error())
+					return
+				}
+
+				player, ok := players[vs.GuildID]
+				if !ok {
+					player = &VoicePlayer{
+						VC:          voiceConnections[vs.GuildID],
+						Queue:       []Song{},
+						AutoAdvance: true,
+					}
+					players[vs.GuildID] = player
+				}
+
+				discord.ChannelMessageSend(message.ChannelID, fmt.Sprintf("Playlist detected with %d songs. Starting download...", len(urls)))
+				DownloadPlaylist(urls, player, discord, message)
+				return
+			} else {
+				song, err = GetVideoIDFromLink(query)
+				if !CheckIfCachedMusic(song.Filename) {
+					discord.ChannelMessageSend(message.ChannelID, "Downloading started")
+					song, err = DownlaodMusicFromLink(query)
+					discord.ChannelMessageSend(message.ChannelID, "Downloaded"+song.Title)
+				}
 			}
 		}
 		if err != nil {
