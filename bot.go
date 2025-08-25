@@ -566,14 +566,14 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 
 		// Download song (either by search or link)
 		var song Song
-		if len(parts) > 2 {
+		if len(parts) > 2 && !strings.Contains(query, "http") {
 			song, err = GetVideoIDFromQuerry(query)
 			if !CheckIfCachedMusic(song.Filename) {
 				discord.ChannelMessageSend(message.ChannelID, "Downloading started")
 				song, err = DownlaodMusicFromQuerry(query)
 				discord.ChannelMessageSend(message.ChannelID, "Downloaded"+song.Title)
 			}
-		} else if len(parts) == 2 {
+		} else if len(parts) == 2 && strings.Contains(query, "http") {
 			song, err = GetVideoIDFromLink(query)
 			if !CheckIfCachedMusic(song.Filename) {
 				discord.ChannelMessageSend(message.ChannelID, "Downloading started")
