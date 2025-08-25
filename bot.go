@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"database/sql"
+	"discord_bot/crud"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -57,11 +59,13 @@ func findUserVoiceState(s *discordgo.Session, guildID, userID string) (*discordg
 	return nil, fmt.Errorf("user not in a voice channel")
 }
 
-func Run(token string) {
+func Run(token string, db *sql.DB) {
 	discord, err := discordgo.New("Bot " + token)
 	checkNilErr(err)
 
-	discord.AddHandler(newMessage)
+	discord.AddHandler(func(s *discordgo.Session, m *discordgo.MessageCreate) {
+		newMessage(s, m, db) // pass db yourself
+	})
 	discord.AddHandler(voiceStateUpdate)
 
 	discord.Open()
@@ -501,10 +505,36 @@ func showQueue(player *VoicePlayer) string {
 	return strings.Join(titles, "\n") // join titles with newlines
 }
 
-func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
+func ShowPlayStats(discord *discordgo.Session, message *discordgo.MessageCreate, db *sql.DB) {
+	var songs []crud.Song_counter
+	var err error
+	songs, err = crud.ReadAllPlayedCountForSong(db)
+	if err != nil {
+		fmt.Println("Error while reading from database :", err)
+	}
+
+	var sb strings.Builder
+	sb.WriteString("Songs statistics are:\n")
+
+	for _, song := range songs {
+		sb.WriteString(fmt.Sprintf("Song title %s was played %d\n", song.Title, song.Played_counter))
+		fmt.Println(song.Title, song.Played_counter)
+	}
+	sb.WriteString("Thats it folks")
+
+	result := sb.String()
+	fmt.Println(result)
+
+	discord.ChannelMessageSend(message.ChannelID, result)
+}
+
+func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate, db *sql.DB) {
 	if message.Author.ID == discord.State.User.ID {
 		return
 	}
+	user_id := message.Author.ID
+	username := message.Author.Username
+	crud.InsertUserIntoDatabase(username, user_id, db)
 	switch {
 	case strings.Contains(message.Content, "!help"):
 		PrintHelp(discord, message)
@@ -525,6 +555,8 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 		fmt.Println(parts)
 		fmt.Println(parts[1])
 		DownlaodMusicFromLink(parts[1])
+	case strings.Contains(message.Content, "!stats"):
+		ShowPlayStats(discord, message, db)
 	case strings.Contains(message.Content, "!join"):
 		JoinServer(discord, message)
 	case strings.Contains(message.Content, "!skip"):
@@ -584,6 +616,8 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 				}
 			}
 		}
+		crud.InsertSongIntoDatabase(song.Filename, song.Title, db)
+		crud.UpdateSongsPlayCount(song.Filename, db)
 		if err != nil {
 			discord.ChannelMessageSend(message.ChannelID, "Failed to download: "+err.Error())
 			return
@@ -614,7 +648,7 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 	}
 }
 
-func main() {
+func MainBOT(db *sql.DB) {
 
 	bytes, err := os.ReadFile("conf.json") // replaces ioutil.ReadFile
 	if err != nil {
@@ -627,5 +661,5 @@ func main() {
 		log.Fatal("Error decoding JSON:", err)
 	}
 
-	Run(config.BotToken)
+	Run(config.BotToken, db)
 }
