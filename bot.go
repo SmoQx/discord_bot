@@ -459,6 +459,7 @@ func DownlaodMusicFromLink(link string) (Song, error) {
 		NoPlaylist().
 		NoProgress().
 		ExtractAudio().
+		Format("bestaudio/best").
 		AudioFormat("mp3").
 		Output("./cache/%(id)s.%(ext)s")
 
@@ -489,6 +490,7 @@ func DownlaodMusicFromQuerry(querry string) (Song, error) {
 		NoPlaylist().
 		NoProgress().
 		ExtractAudio().
+		Format("bestaudio/best").
 		AudioFormat("mp3").
 		Output("./cache/%(id)s.%(ext)s")
 
