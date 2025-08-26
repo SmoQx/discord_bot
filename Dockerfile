@@ -6,5 +6,5 @@ WORKDIR /app
 
 COPY . /app/
 
-CMD ["go", "run", "bot.go"]
+CMD ["./discord_bot"]
 
