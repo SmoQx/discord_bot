@@ -42,7 +42,7 @@ var players = make(map[string]*VoicePlayer)
 
 func checkNilErr(e error) {
 	if e != nil {
-		log.Fatal("Something whent wrong")
+		fmt.Println("Something whent wrong")
 	}
 }
 
@@ -123,7 +123,7 @@ func Run(token string, db *sql.DB) {
 	for _, cmd := range commands {
 		_, err := discord.ApplicationCommandCreate(discord.State.User.ID, "", cmd)
 		if err != nil {
-			log.Fatalf("Cannot create '%v' command: %v", cmd.Name, err)
+			fmt.Println("Cannot create '%v' command: %v", cmd.Name, err)
 		}
 	}
 	fmt.Println("Bot started")
