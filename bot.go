@@ -118,6 +118,10 @@ func Run(token string, db *sql.DB) {
 			Name:        "skip",
 			Description: "Skips currently playing song",
 		},
+		{
+			Name:        "kolendy",
+			Description: "Plays kolendy none stop",
+		},
 	}
 
 	for _, cmd := range commands {
@@ -792,8 +796,11 @@ func ShowPlayStatsForInteraction(discord *discordgo.Session, message *discordgo.
 	result := sb.String()
 	fmt.Println(result)
 
-	discord.FollowupMessageCreate(message.Interaction, false, &discordgo.WebhookParams{
-		Content: result,
+	discord.InteractionRespond(message.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Content: result,
+		},
 	})
 }
 
@@ -835,7 +842,8 @@ func newCommand(discord *discordgo.Session, i *discordgo.InteractionCreate, db *
 !stop - stops the bot
 !leave - bot leaves
 !help - showes this message
-!stats - for servers songs statistics`
+!stats - for servers songs statistics
+!kolenda - plays klocuch on loop`
 			discord.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 				Type: discordgo.InteractionResponseChannelMessageWithSource,
 				Data: &discordgo.InteractionResponseData{
@@ -901,6 +909,56 @@ func newCommand(discord *discordgo.Session, i *discordgo.InteractionCreate, db *
 				},
 			})
 			JoinServerFromCommand(discord, i)
+		case "kolenda":
+			discord.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: "I will start the music soon ",
+				},
+			})
+			// query := i.ApplicationCommandData().Options[0].StringValue()
+			// here you can call your existing !play logic, reusing PlayMusic
+
+			vs, err := findUserVoiceState(discord, i.GuildID, i.Member.User.ID)
+
+			if err != nil {
+				discord.FollowupMessageCreate(i.Interaction, false, &discordgo.WebhookParams{
+					Content: "Something went wrong i cannot find you",
+				})
+			}
+
+			if _, ok := voiceConnections[vs.GuildID]; !ok {
+				JoinServerFromCommand(discord, i)
+			}
+			var songs []Song
+			var kolendy []crud.Song_counter
+			kolendy, err = crud.GetKolenda(db)
+
+			if err != nil {
+				discord.FollowupMessageCreate(i.Interaction, false, &discordgo.WebhookParams{
+					Content: "Oj amigo cannot find any klouch songs",
+				})
+			}
+
+			for _, p := range kolendy {
+				var song = Song{Filename: p.Id, Title: p.Title}
+				songs = append(songs, song)
+			}
+
+			player, ok := players[vs.GuildID]
+			if !ok {
+				player = &VoicePlayer{
+					VC:          voiceConnections[vs.GuildID],
+					Queue:       []Song{},
+					AutoAdvance: true,
+				}
+				players[vs.GuildID] = player
+			}
+
+			player.Queue = songs[1:]
+
+			go PlayMusicFromInteraction(player, songs[0], discord, i)
+
 		case "play":
 			discord.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 				Type: discordgo.InteractionResponseChannelMessageWithSource,
