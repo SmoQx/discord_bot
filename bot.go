@@ -76,7 +76,6 @@ func Run(token string, db *sql.DB) {
 	discord.Open()
 
 	defer discord.Close()
-	
 
 	commands := []*discordgo.ApplicationCommand{
 		{
@@ -466,6 +465,7 @@ func DownlaodMusicFromLink(link string) (Song, error) {
 		ExtractAudio().
 		Format("bestaudio/best").
 		AudioFormat("mp3").
+		CookiesFromBrowser("firefox").
 		Output("./cache/%(id)s.%(ext)s")
 
 	r, err := dl.Run(context.TODO(), link)
@@ -497,7 +497,8 @@ func DownlaodMusicFromQuerry(querry string) (Song, error) {
 		ExtractAudio().
 		Format("bestaudio/best").
 		AudioFormat("mp3").
-		Output("./cache/%(id)s.%(ext)s")
+		Output("./cache/%(id)s.%(ext)s").
+		CookiesFromBrowser("firefox")
 
 	r, err := dl.Run(context.TODO(), query)
 	if err != nil {
@@ -589,7 +590,8 @@ func GetVideoIDFromLink(link string) (Song, error) {
 	dl := ytdlp.New().
 		PrintJSON().
 		NoProgress().
-		SkipDownload()
+		SkipDownload().
+		CookiesFromBrowser("firefox")
 
 	r, err := dl.Run(context.TODO(), link)
 	if err != nil {
@@ -618,7 +620,8 @@ func GetVideoIDFromQuerry(query string) (Song, error) {
 	dl := ytdlp.New().
 		PrintJSON().
 		NoProgress().
-		SkipDownload()
+		SkipDownload().
+		CookiesFromBrowser("firefox")
 
 	r, err := dl.Run(context.TODO(), searchQuery)
 	if err != nil {
@@ -644,7 +647,8 @@ func IsPlaylist(link string) (bool, error) {
 
 	dl := ytdlp.New().
 		PrintJSON().
-		SkipDownload()
+		SkipDownload().
+		CookiesFromBrowser("firefox")
 
 	r, err := dl.Run(context.TODO(), link)
 	if err != nil {
@@ -681,6 +685,7 @@ func FetchPlaylistEntries(link string) ([]string, error) {
 		PrintJSON().
 		DumpSingleJSON().
 		SkipDownload().
+		CookiesFromBrowser("firefox").
 		Run(context.TODO(), link)
 
 	if err != nil {
