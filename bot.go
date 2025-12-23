@@ -910,6 +910,7 @@ func newCommand(discord *discordgo.Session, i *discordgo.InteractionCreate, db *
 			})
 			JoinServerFromCommand(discord, i)
 		case "kolenda":
+			crud.InitDatabase(db)
 			discord.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 				Type: discordgo.InteractionResponseChannelMessageWithSource,
 				Data: &discordgo.InteractionResponseData{
