@@ -1,0 +1,7 @@
+services:
+  app:
+    network_mode: bridge
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: on-failure
