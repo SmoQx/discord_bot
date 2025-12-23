@@ -26,7 +26,7 @@ type Kolenda struct {
 
 func InitDatabase(db *sql.DB) {
 	_, err := db.Exec(`CREATE TABLE IF NOT EXISTS kolenda (
-		songId TEXT FOREIGN KEY,
+		songId TEXT ,
 		isKolenda BOOLEAN
 	);`)
 
