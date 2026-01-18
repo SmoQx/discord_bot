@@ -465,7 +465,7 @@ func DownlaodMusicFromLink(link string) (Song, error) {
 		ExtractAudio().
 		Format("bestaudio/best").
 		AudioFormat("mp3").
-		ExtractorArgs("youtube:player-client=tv_embedded").
+		Cookies("firefox").
 		Output("./cache/%(id)s.%(ext)s")
 
 	r, err := dl.Run(context.TODO(), link)
@@ -498,7 +498,7 @@ func DownlaodMusicFromQuerry(querry string) (Song, error) {
 		Format("bestaudio/best").
 		AudioFormat("mp3").
 		Output("./cache/%(id)s.%(ext)s").
-		ExtractorArgs("youtube:player-client=tv_embedded")
+		CookiesFromBrowser("firefox")
 
 	r, err := dl.Run(context.TODO(), query)
 	if err != nil {
@@ -591,7 +591,7 @@ func GetVideoIDFromLink(link string) (Song, error) {
 		PrintJSON().
 		NoProgress().
 		SkipDownload().
-		ExtractorArgs("youtube:player-client=tv_embedded")
+		CookiesFromBrowser("firefox")
 
 	r, err := dl.Run(context.TODO(), link)
 	if err != nil {
@@ -621,7 +621,7 @@ func GetVideoIDFromQuerry(query string) (Song, error) {
 		PrintJSON().
 		NoProgress().
 		SkipDownload().
-		ExtractorArgs("youtube:player-client=tv_embedded")
+		CookiesFromBrowser("firefox")
 
 	r, err := dl.Run(context.TODO(), searchQuery)
 	if err != nil {
@@ -648,7 +648,7 @@ func IsPlaylist(link string) (bool, error) {
 	dl := ytdlp.New().
 		PrintJSON().
 		SkipDownload().
-		ExtractorArgs("youtube:player-client=tv_embedded")
+		CookiesFromBrowser("firefox")
 
 	r, err := dl.Run(context.TODO(), link)
 	if err != nil {
@@ -685,7 +685,7 @@ func FetchPlaylistEntries(link string) ([]string, error) {
 		PrintJSON().
 		DumpSingleJSON().
 		SkipDownload().
-		ExtractorArgs("youtube:player-client=tv_embedded").
+		CookiesFromBrowser("firefox").
 		Run(context.TODO(), link)
 
 	if err != nil {
