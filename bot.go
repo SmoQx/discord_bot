@@ -478,7 +478,7 @@ func DownlaodMusicFromLink(link string) (Song, error) {
 		Format("bestaudio").
 		AudioFormat("opus").
 		Output("./cache/%(id)s.%(ext)s").
-		ForceIPv4().
+		ForceIPv4().Cookies("./cookies.txt").
 		Retries("10").FragmentRetries("10").ConcurrentFragments(1)
 
 	r, err := dl.Run(context.TODO(), link)
@@ -511,7 +511,7 @@ func DownlaodMusicFromQuerry(querry string) (Song, error) {
 		Format("bestaudio").
 		AudioFormat("opus").
 		Output("./cache/%(id)s.%(ext)s").
-		ForceIPv4().
+		ForceIPv4().Cookies("./cookies.txt").
 		Retries("10").FragmentRetries("10").ConcurrentFragments(1)
 
 	r, err := dl.Run(context.TODO(), query)
