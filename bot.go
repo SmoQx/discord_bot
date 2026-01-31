@@ -475,10 +475,11 @@ func DownlaodMusicFromLink(link string) (Song, error) {
 		NoPlaylist().
 		NoProgress().
 		ExtractAudio().
-		Format("bestaudio/best").
-		AudioFormat("mp3").
-		Cookies("firefox").
-		Output("./cache/%(id)s.%(ext)s")
+		Format("bestaudio").
+		AudioFormat("opus").
+		Output("./cache/%(id)s.%(ext)s").
+		ForceIPv4().
+		Retries("10").FragmentRetries("10").ConcurrentFragments(1)
 
 	r, err := dl.Run(context.TODO(), link)
 	if err != nil {
@@ -507,10 +508,11 @@ func DownlaodMusicFromQuerry(querry string) (Song, error) {
 		NoPlaylist().
 		NoProgress().
 		ExtractAudio().
-		Format("bestaudio/best").
-		AudioFormat("mp3").
+		Format("bestaudio").
+		AudioFormat("opus").
 		Output("./cache/%(id)s.%(ext)s").
-		CookiesFromBrowser("firefox")
+		ForceIPv4().
+		Retries("10").FragmentRetries("10").ConcurrentFragments(1)
 
 	r, err := dl.Run(context.TODO(), query)
 	if err != nil {
