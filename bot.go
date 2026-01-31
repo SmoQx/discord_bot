@@ -13,6 +13,7 @@ import (
 	"os/signal"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/lrstanley/go-ytdlp"
@@ -302,10 +303,21 @@ func PlayMusicFromInteraction(player *VoicePlayer, song Song, discord *discordgo
 		if err := binary.Read(ffmpegOut, binary.LittleEndian, pcm); err != nil {
 			break
 		}
-		opus, _ := encoder.Encode(pcm, 960, 960*2*2)
-		vc.OpusSend <- opus
+		opus, err := encoder.Encode(pcm, 960, 960*2*2)
+		if err != nil {
+			fmt.Println("opus encode error:", err)
+			continue
+		}
+		select {
+		case vc.OpusSend <- opus:
+			// sent OK
 
-		if !player.Playing { // stop/skip requested
+		case <-time.After(200 * time.Millisecond):
+			fmt.Println("opus send timeout — dropping frame")
+			// drop frame instead of blocking
+		}
+
+		if !player.Playing {
 			break
 		}
 	}
