@@ -1,13 +1,10 @@
 services:
   app:
     network_mode: bridge
-    volumes:
-      - bin:./bin/
-    command: ["./discord_bot"]
     build:
       context: .
       dockerfile: Dockerfile
+    volumes:
+      - ./bin:/app/bin
+    command: ["/app/bin/discord_bot"]
     restart: on-failure
-
-volumes:
-    - bin
