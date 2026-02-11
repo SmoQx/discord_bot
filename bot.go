@@ -468,7 +468,6 @@ func CheckIfCachedMusic(filepath string) bool {
 }
 
 func DownlaodMusicFromLink(link string) (Song, error) {
-	ytdlp.MustInstallAll(context.TODO())
 
 	dl := ytdlp.New().
 		PrintJSON().
@@ -500,7 +499,6 @@ func DownlaodMusicFromLink(link string) (Song, error) {
 }
 
 func DownlaodMusicFromQuerry(querry string) (Song, error) {
-	ytdlp.MustInstallAll(context.TODO())
 
 	query := fmt.Sprintf("ytsearch1:%s", querry)
 	dl := ytdlp.New().
@@ -599,7 +597,6 @@ func SkipMusic(vc *discordgo.VoiceConnection, discord *discordgo.Session, messag
 }
 
 func GetVideoIDFromLink(link string) (Song, error) {
-	ytdlp.MustInstallAll(context.TODO())
 
 	dl := ytdlp.New().
 		PrintJSON().
@@ -627,7 +624,6 @@ func GetVideoIDFromLink(link string) (Song, error) {
 }
 
 func GetVideoIDFromQuerry(query string) (Song, error) {
-	ytdlp.MustInstallAll(context.TODO())
 
 	searchQuery := fmt.Sprintf("ytsearch1:%s", query)
 
@@ -657,7 +653,6 @@ func GetVideoIDFromQuerry(query string) (Song, error) {
 }
 
 func IsPlaylist(link string) (bool, error) {
-	ytdlp.MustInstallAll(context.TODO())
 
 	dl := ytdlp.New().
 		PrintJSON().
@@ -693,7 +688,6 @@ func IsPlaylist(link string) (bool, error) {
 }
 
 func FetchPlaylistEntries(link string) ([]string, error) {
-	ytdlp.MustInstallAll(context.TODO())
 
 	r, err := ytdlp.New().
 		PrintJSON().
