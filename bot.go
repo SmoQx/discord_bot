@@ -479,8 +479,7 @@ func DownlaodMusicFromLink(link string) (Song, error) {
 		AudioFormat("opus").
 		Output("./cache/%(id)s.%(ext)s").
 		ForceIPv4().Cookies("./cookies.txt").
-		Retries("10").FragmentRetries("10").ConcurrentFragments(1).
-		ExtractorArgs("youtube:player_client=tv")
+		Retries("10").FragmentRetries("10").ConcurrentFragments(1)
 
 	r, err := dl.Run(context.TODO(), link)
 	if err != nil {
@@ -513,8 +512,7 @@ func DownlaodMusicFromQuerry(querry string) (Song, error) {
 		AudioFormat("opus").
 		Output("./cache/%(id)s.%(ext)s").
 		ForceIPv4().Cookies("./cookies.txt").
-		Retries("10").FragmentRetries("10").ConcurrentFragments(1).
-		ExtractorArgs("youtube:player_client=tv")
+		Retries("10").FragmentRetries("10").ConcurrentFragments(1)
 
 	r, err := dl.Run(context.TODO(), query)
 	if err != nil {
@@ -607,8 +605,7 @@ func GetVideoIDFromLink(link string) (Song, error) {
 		PrintJSON().
 		NoProgress().
 		SkipDownload().
-		ForceIPv4().Cookies("./cookies.txt").
-		ExtractorArgs("youtube:player_client=tv")
+		ForceIPv4().Cookies("./cookies.txt")
 
 	r, err := dl.Run(context.TODO(), link)
 	if err != nil {
@@ -638,8 +635,7 @@ func GetVideoIDFromQuerry(query string) (Song, error) {
 		PrintJSON().
 		NoProgress().
 		SkipDownload().
-		ForceIPv4().Cookies("./cookies.txt").
-		ExtractorArgs("youtube:player_client=tv")
+		ForceIPv4().Cookies("./cookies.txt")
 
 	r, err := dl.Run(context.TODO(), searchQuery)
 	if err != nil {
@@ -666,8 +662,7 @@ func IsPlaylist(link string) (bool, error) {
 	dl := ytdlp.New().
 		PrintJSON().
 		SkipDownload().
-		ForceIPv4().Cookies("./cookies.txt").
-		ExtractorArgs("youtube:player_client=tv")
+		ForceIPv4().Cookies("./cookies.txt")
 
 	r, err := dl.Run(context.TODO(), link)
 	if err != nil {
@@ -705,7 +700,6 @@ func FetchPlaylistEntries(link string) ([]string, error) {
 		DumpSingleJSON().
 		SkipDownload().
 		ForceIPv4().Cookies("./cookies.txt").
-		ExtractorArgs("youtube:player_client=tv").
 		Run(context.TODO(), link)
 
 	if err != nil {
