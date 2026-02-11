@@ -481,8 +481,6 @@ func DownlaodMusicFromLink(link string) (Song, error) {
 		ForceIPv4().CookiesFromBrowser("brave").
 		Retries("10").FragmentRetries("10").ConcurrentFragments(1)
 
-	dl.Update(context.TODO())
-
 	r, err := dl.Run(context.TODO(), link)
 	if err != nil {
 		return Song{}, err
@@ -516,7 +514,6 @@ func DownlaodMusicFromQuerry(querry string) (Song, error) {
 		ForceIPv4().CookiesFromBrowser("brave").
 		Retries("10").FragmentRetries("10").ConcurrentFragments(1)
 
-	dl.Update(context.TODO())
 	r, err := dl.Run(context.TODO(), query)
 	if err != nil {
 		return Song{}, err
