@@ -1209,6 +1209,8 @@ func MainBOT(db *sql.DB) {
 		log.Fatal("Error decoding JSON:", err)
 	}
 
+	ytdlp.MustInstall(context.TODO(), &ytdlp.InstallOptions{AllowVersionMismatch: true})
+
 	fmt.Println(ytdlp.GetCacheDir())
 	Run(config.BotToken, db)
 }
