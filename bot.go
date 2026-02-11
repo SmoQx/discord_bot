@@ -1209,5 +1209,6 @@ func MainBOT(db *sql.DB) {
 		log.Fatal("Error decoding JSON:", err)
 	}
 
+	fmt.Println(ytdlp.GetCacheDir())
 	Run(config.BotToken, db)
 }
