@@ -478,7 +478,7 @@ func DownlaodMusicFromLink(link string) (Song, error) {
 		Format("bestaudio").
 		AudioFormat("opus").
 		Output("./cache/%(id)s.%(ext)s").
-		ForceIPv4().Cookies("./cookies.txt").
+		ForceIPv4().CookiesFromBrowser("firefox").
 		Retries("10").FragmentRetries("10").ConcurrentFragments(1)
 
 	r, err := dl.Run(context.TODO(), link)
@@ -511,7 +511,7 @@ func DownlaodMusicFromQuerry(querry string) (Song, error) {
 		Format("bestaudio").
 		AudioFormat("opus").
 		Output("./cache/%(id)s.%(ext)s").
-		ForceIPv4().Cookies("./cookies.txt").
+		ForceIPv4().CookiesFromBrowser("firefox").
 		Retries("10").FragmentRetries("10").ConcurrentFragments(1)
 
 	r, err := dl.Run(context.TODO(), query)
@@ -605,7 +605,7 @@ func GetVideoIDFromLink(link string) (Song, error) {
 		PrintJSON().
 		NoProgress().
 		SkipDownload().
-		ForceIPv4().Cookies("./cookies.txt")
+		ForceIPv4().CookiesFromBrowser("firefox")
 
 	r, err := dl.Run(context.TODO(), link)
 	if err != nil {
@@ -635,7 +635,7 @@ func GetVideoIDFromQuerry(query string) (Song, error) {
 		PrintJSON().
 		NoProgress().
 		SkipDownload().
-		ForceIPv4().Cookies("./cookies.txt")
+		ForceIPv4().CookiesFromBrowser("firefox")
 
 	r, err := dl.Run(context.TODO(), searchQuery)
 	if err != nil {
@@ -662,7 +662,7 @@ func IsPlaylist(link string) (bool, error) {
 	dl := ytdlp.New().
 		PrintJSON().
 		SkipDownload().
-		ForceIPv4().Cookies("./cookies.txt")
+		ForceIPv4().CookiesFromBrowser("firefox")
 
 	r, err := dl.Run(context.TODO(), link)
 	if err != nil {
@@ -699,7 +699,7 @@ func FetchPlaylistEntries(link string) ([]string, error) {
 		PrintJSON().
 		DumpSingleJSON().
 		SkipDownload().
-		ForceIPv4().Cookies("./cookies.txt").
+		ForceIPv4().CookiesFromBrowser("firefox").
 		Run(context.TODO(), link)
 
 	if err != nil {
