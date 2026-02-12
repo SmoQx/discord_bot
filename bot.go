@@ -480,8 +480,7 @@ func DownlaodMusicFromLink(link string) (Song, error) {
 		Format("bestaudio").
 		AudioFormat("opus").
 		Output("./cache/%(id)s.%(ext)s").
-		ForceIPv4().CookiesFromBrowser("brave").
-		Retries("10").FragmentRetries("10").ConcurrentFragments(1)
+		ForceIPv4().CookiesFromBrowser("brave")
 
 	r, err := dl.Run(context.TODO(), link)
 	if err != nil {
@@ -512,8 +511,7 @@ func DownlaodMusicFromQuerry(querry string) (Song, error) {
 		Format("bestaudio").
 		AudioFormat("opus").
 		Output("./cache/%(id)s.%(ext)s").
-		ForceIPv4().CookiesFromBrowser("brave").
-		Retries("10").FragmentRetries("10").ConcurrentFragments(1)
+		ForceIPv4().CookiesFromBrowser("brave")
 
 	r, err := dl.Run(context.TODO(), query)
 	if err != nil {
