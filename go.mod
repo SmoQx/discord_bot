@@ -3,7 +3,7 @@ module discord_bot
 go 1.24.6
 
 require (
-	github.com/bwmarrin/discordgo v0.29.0
+	github.com/bwmarrin/discordgo master
 	github.com/lrstanley/go-ytdlp v1.2.7
 	github.com/mattn/go-sqlite3 v1.14.32
 	layeh.com/gopus v0.0.0-20210501142526-1ee02d434e32
@@ -18,4 +18,3 @@ require (
 	golang.org/x/sys v0.38.0 // indirect
 )
 
-replace github.com/bwmarrin/discordgo => github.com/ozraru/discordgo patch-rework-vc
