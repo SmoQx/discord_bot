@@ -1212,9 +1212,9 @@ func MainBOT(db *sql.DB) {
 		log.Fatal("Error decoding JSON:", err)
 	}
 
-	// ytdlp.Install(context.TODO(), &ytdlp.InstallOptions{AllowVersionMismatch: true, DisableDownload: true})
-	// ytdlp.MustInstallFFmpeg(context.TODO(), nil)
-	ytdlp.MustInstall(context.TODO(), nil)
+	ytdlp.Install(context.TODO(), &ytdlp.InstallOptions{AllowVersionMismatch: true})
+	ytdlp.MustInstallFFmpeg(context.TODO(), nil)
+	ytdlp.MustInstallFFprobe(context.TODO(), nil)
 
 	fmt.Println(ytdlp.GetCacheDir())
 	Run(config.BotToken, db)
