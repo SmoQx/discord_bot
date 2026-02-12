@@ -1210,6 +1210,7 @@ func MainBOT(db *sql.DB) {
 	}
 
 	ytdlp.Install(context.TODO(), &ytdlp.InstallOptions{AllowVersionMismatch: true, DisableDownload: true})
+	ytdlp.MustInstallFFmpeg(context.TODO(), nil)
 
 	fmt.Println(ytdlp.GetCacheDir())
 	Run(config.BotToken, db)
