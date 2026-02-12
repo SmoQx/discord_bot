@@ -18,4 +18,4 @@ require (
 	golang.org/x/sys v0.38.0 // indirect
 )
 
-replace github.com/bwmarrin/discordgo => github.com/darui3018823/dgo v0.30.0
+replace github.com/bwmarrin/discordgo => github.com/ozraru/discordgo patch-rework-vc
