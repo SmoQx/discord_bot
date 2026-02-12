@@ -478,8 +478,9 @@ func DownlaodMusicFromLink(link string) (Song, error) {
 		NoProgress().
 		ExtractAudio().
 		Format("bestaudio").
-		AudioFormat("opus").
-		Output("./cache/%(id)s.%(ext)s")
+		AudioFormat("mp3").
+		Output("./cache/%(id)s.%(ext)s").
+		CookiesFromBrowser("brave")
 
 	r, err := dl.Run(context.TODO(), link)
 	if err != nil {
@@ -492,6 +493,8 @@ func DownlaodMusicFromLink(link string) (Song, error) {
 
 	id, _ := data["id"].(string)
 	title, _ := data["title"].(string)
+	ext, _ := data["ext"].(string)
+	fmt.Println(ext)
 
 	return Song{
 		Title:    title,
@@ -508,8 +511,9 @@ func DownlaodMusicFromQuerry(querry string) (Song, error) {
 		NoProgress().
 		ExtractAudio().
 		Format("bestaudio").
-		AudioFormat("opus").
-		Output("./cache/%(id)s.%(ext)s")
+		AudioFormat("mp3").
+		Output("./cache/%(id)s.%(ext)s").
+		CookiesFromBrowser("brave")
 
 	r, err := dl.Run(context.TODO(), query)
 	if err != nil {
@@ -522,7 +526,9 @@ func DownlaodMusicFromQuerry(querry string) (Song, error) {
 
 	id, _ := data["id"].(string)
 	title, _ := data["title"].(string)
+	ext, _ := data["ext"].(string)
 
+	fmt.Println(ext)
 	return Song{
 		Title:    title,
 		Filename: id + ".mp3",
@@ -600,7 +606,8 @@ func GetVideoIDFromLink(link string) (Song, error) {
 	dl := ytdlp.New().
 		PrintJSON().
 		NoProgress().
-		SkipDownload()
+		SkipDownload().
+		CookiesFromBrowser("brave")
 
 	r, err := dl.Run(context.TODO(), link)
 	if err != nil {
@@ -628,7 +635,8 @@ func GetVideoIDFromQuerry(query string) (Song, error) {
 	dl := ytdlp.New().
 		PrintJSON().
 		NoProgress().
-		SkipDownload()
+		SkipDownload().
+		CookiesFromBrowser("brave")
 
 	r, err := dl.Run(context.TODO(), searchQuery)
 	if err != nil {
@@ -653,7 +661,8 @@ func IsPlaylist(link string) (bool, error) {
 
 	dl := ytdlp.New().
 		PrintJSON().
-		SkipDownload()
+		SkipDownload().
+		CookiesFromBrowser("brave")
 
 	r, err := dl.Run(context.TODO(), link)
 	if err != nil {
@@ -689,6 +698,7 @@ func FetchPlaylistEntries(link string) ([]string, error) {
 		PrintJSON().
 		DumpSingleJSON().
 		SkipDownload().
+		CookiesFromBrowser("brave").
 		Run(context.TODO(), link)
 
 	if err != nil {
