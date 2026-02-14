@@ -6,5 +6,6 @@ services:
       dockerfile: Dockerfile
     volumes:
       - ./bin:/app/bin
+      - /home/smoq/.config/BraveSoftware:/root/.config/BraveSoftware
     command: ["/app/bin/discord_bot"]
     restart: on-failure
