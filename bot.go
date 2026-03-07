@@ -260,6 +260,7 @@ func PlayMusicFromInteraction(player *VoicePlayer, song Song, discord *discordgo
 	// Start a fresh playback: allow auto-advance unless a skip/stop disables it
 	player.Playing = true
 	player.AutoAdvance = true
+	fmt.Println("play")
 
 	vc := player.VC
 	if vc.Status != 3 {
