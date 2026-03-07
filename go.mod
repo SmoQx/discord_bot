@@ -17,5 +17,3 @@ require (
 	golang.org/x/crypto v0.44.0 // indirect
 	golang.org/x/sys v0.38.0 // indirect
 )
-
-replace github.com/bwmarrin/discordgo => github.com/yeongaori/discordgo-fork v0.0.0-20260307131331-930441e7bd78
