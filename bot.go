@@ -262,7 +262,7 @@ func PlayMusicFromInteraction(player *VoicePlayer, song Song, discord *discordgo
 	player.AutoAdvance = true
 
 	vc := player.VC
-	if vc.Status != 3 {
+	if vc.Status == 3 {
 		fmt.Println("error the voice client isnt ready")
 	}
 	discord.FollowupMessageCreate(i.Interaction, false, &discordgo.WebhookParams{
