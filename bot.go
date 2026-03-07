@@ -146,7 +146,7 @@ func voiceStateUpdate(s *discordgo.Session, vs *discordgo.VoiceStateUpdate) {
 	}
 
 	// Get the channel the bot is in
-	botChannelID := vc.ChannelID
+	botChannelID := vs.ChannelID
 	if botChannelID == "" {
 		return
 	}
@@ -167,7 +167,7 @@ func voiceStateUpdate(s *discordgo.Session, vs *discordgo.VoiceStateUpdate) {
 	// If no one else is left, disconnect
 	if memberCount == 0 {
 		fmt.Println("No one left, leaving channel.")
-		vc.Disconnect()
+		vc.Disconnect(context.TODO())
 		delete(voiceConnections, vs.GuildID)
 		delete(players, vs.GuildID)
 	}
@@ -195,7 +195,7 @@ func JoinServer(discord *discordgo.Session, message *discordgo.MessageCreate) {
 	}
 
 	// Connect to that voice channel
-	vc, err := discord.ChannelVoiceJoin(message.GuildID, vs.ChannelID, false, true)
+	vc, err := discord.ChannelVoiceJoin(context.TODO(), message.GuildID, vs.ChannelID, false, true)
 	if err != nil {
 		discord.ChannelMessageSend(message.ChannelID, "Failed to join voice channel.")
 		fmt.Println("Error joining voice channel:", err)
@@ -217,7 +217,7 @@ func JoinServerFromCommand(discord *discordgo.Session, i *discordgo.InteractionC
 	}
 
 	// Connect to that voice channel
-	vc, err := discord.ChannelVoiceJoin(i.GuildID, vs.ChannelID, false, true)
+	vc, err := discord.ChannelVoiceJoin(context.TODO(), i.GuildID, vs.ChannelID, false, true)
 	if err != nil {
 		discord.FollowupMessageCreate(i.Interaction, false, &discordgo.WebhookParams{
 			Content: "Failed to join voice channel.",
@@ -232,7 +232,7 @@ func JoinServerFromCommand(discord *discordgo.Session, i *discordgo.InteractionC
 
 func LeaveServerForInteraction(discord *discordgo.Session, i *discordgo.InteractionCreate) {
 	if vc, ok := discord.VoiceConnections[i.GuildID]; ok {
-		vc.Disconnect()
+		vc.Disconnect(context.TODO())
 		delete(voiceConnections, vc.GuildID)
 		delete(players, vc.GuildID)
 		discord.FollowupMessageCreate(i.Interaction, false, &discordgo.WebhookParams{
@@ -247,7 +247,7 @@ func LeaveServerForInteraction(discord *discordgo.Session, i *discordgo.Interact
 
 func LeaveServer(discord *discordgo.Session, message *discordgo.MessageCreate) {
 	if vc, ok := discord.VoiceConnections[message.GuildID]; ok {
-		vc.Disconnect()
+		vc.Disconnect(context.TODO())
 		delete(voiceConnections, vc.GuildID)
 		delete(players, vc.GuildID)
 		discord.ChannelMessageSend(message.ChannelID, "Leaveing the voice channel")
@@ -262,7 +262,7 @@ func PlayMusicFromInteraction(player *VoicePlayer, song Song, discord *discordgo
 	player.AutoAdvance = true
 
 	vc := player.VC
-	if !vc.Ready {
+	if vc.Status != 3 {
 		fmt.Println("error the voice client isnt ready")
 	}
 	discord.FollowupMessageCreate(i.Interaction, false, &discordgo.WebhookParams{
