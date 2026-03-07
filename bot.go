@@ -262,7 +262,7 @@ func PlayMusicFromInteraction(player *VoicePlayer, song Song, discord *discordgo
 	player.AutoAdvance = true
 
 	vc := player.VC
-	if vc.Status == 3 {
+	if vc.Status != 3 {
 		fmt.Println("error the voice client isnt ready")
 	}
 	discord.FollowupMessageCreate(i.Interaction, false, &discordgo.WebhookParams{
@@ -482,7 +482,7 @@ func DownlaodMusicFromLink(link string) (Song, error) {
 		Output("./cache/%(id)s.%(ext)s").
 		CookiesFromBrowser("brave")
 
-	r, err := dl.Run(context.TODO(), link)
+	r, err := dl.Run(context.Background(), link)
 	if err != nil {
 		return Song{}, err
 	}
@@ -515,7 +515,7 @@ func DownlaodMusicFromQuerry(querry string) (Song, error) {
 		Output("./cache/%(id)s.%(ext)s").
 		CookiesFromBrowser("brave")
 
-	r, err := dl.Run(context.TODO(), query)
+	r, err := dl.Run(context.Background(), query)
 	if err != nil {
 		return Song{}, err
 	}
@@ -609,7 +609,7 @@ func GetVideoIDFromLink(link string) (Song, error) {
 		SkipDownload().
 		CookiesFromBrowser("brave")
 
-	r, err := dl.Run(context.TODO(), link)
+	r, err := dl.Run(context.Background(), link)
 	if err != nil {
 		return Song{}, err
 	}
@@ -638,7 +638,7 @@ func GetVideoIDFromQuerry(query string) (Song, error) {
 		SkipDownload().
 		CookiesFromBrowser("brave")
 
-	r, err := dl.Run(context.TODO(), searchQuery)
+	r, err := dl.Run(context.Background(), searchQuery)
 	if err != nil {
 		return Song{}, err
 	}
@@ -664,7 +664,7 @@ func IsPlaylist(link string) (bool, error) {
 		SkipDownload().
 		CookiesFromBrowser("brave")
 
-	r, err := dl.Run(context.TODO(), link)
+	r, err := dl.Run(context.Background(), link)
 	if err != nil {
 		return false, err
 	}
@@ -699,7 +699,7 @@ func FetchPlaylistEntries(link string) ([]string, error) {
 		DumpSingleJSON().
 		SkipDownload().
 		CookiesFromBrowser("brave").
-		Run(context.TODO(), link)
+		Run(context.Background(), link)
 
 	if err != nil {
 		return nil, err
@@ -1214,9 +1214,9 @@ func MainBOT(db *sql.DB) {
 		log.Fatal("Error decoding JSON:", err)
 	}
 
-	ytdlp.Install(context.TODO(), &ytdlp.InstallOptions{AllowVersionMismatch: true})
-	ytdlp.MustInstallFFmpeg(context.TODO(), nil)
-	ytdlp.MustInstallFFprobe(context.TODO(), nil)
+	ytdlp.Install(context.Background(), &ytdlp.InstallOptions{AllowVersionMismatch: true})
+	ytdlp.MustInstallFFmpeg(context.Background(), nil)
+	ytdlp.MustInstallFFprobe(context.Background(), nil)
 
 	fmt.Println(ytdlp.GetCacheDir())
 	Run(config.BotToken, db)
