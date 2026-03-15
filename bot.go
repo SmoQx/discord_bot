@@ -479,7 +479,7 @@ func DownlaodMusicFromLink(link string) (Song, error) {
 		NoProgress().
 		ExtractAudio().
 		Format("bestaudio").
-		AudioFormat("mp3").
+		AudioFormat("mp3").ExtractorArgs("youtube:player_js_variant=tv").
 		Output("./cache/%(id)s.%(ext)s").
 		CookiesFromBrowser("brave")
 
@@ -512,7 +512,7 @@ func DownlaodMusicFromQuerry(querry string) (Song, error) {
 		NoProgress().
 		ExtractAudio().
 		Format("bestaudio").
-		AudioFormat("mp3").
+		AudioFormat("mp3").ExtractorArgs("youtube:player_js_variant=tv").
 		Output("./cache/%(id)s.%(ext)s").
 		CookiesFromBrowser("brave")
 
