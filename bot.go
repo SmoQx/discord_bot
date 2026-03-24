@@ -1000,11 +1000,13 @@ func newCommand(discord *discordgo.Session, i *discordgo.InteractionCreate, db *
 			var song Song
 			if !strings.Contains(query, "http") {
 				song, err = GetVideoIDFromQuerry(query)
+				fmt.Println(err)
 				if !CheckIfCachedMusic(song.Filename) {
 					discord.FollowupMessageCreate(i.Interaction, false, &discordgo.WebhookParams{
 						Content: "Downloading started",
 					})
 					song, err = DownlaodMusicFromQuerry(query)
+					fmt.Println(err)
 					discord.FollowupMessageCreate(i.Interaction, false, &discordgo.WebhookParams{
 						Content: "Downloaded" + song.Title,
 					})
@@ -1039,6 +1041,7 @@ func newCommand(discord *discordgo.Session, i *discordgo.InteractionCreate, db *
 					return
 				} else {
 					song, err = GetVideoIDFromLink(query)
+					fmt.Println(err)
 					if !CheckIfCachedMusic(song.Filename) {
 						discord.FollowupMessageCreate(i.Interaction, false, &discordgo.WebhookParams{
 							Content: "Downloading started",
