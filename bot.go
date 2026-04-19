@@ -172,6 +172,7 @@ func voiceStateUpdate(s *discordgo.Session, vs *discordgo.VoiceStateUpdate) {
 		delete(players, vs.GuildID)
 	}
 	fmt.Println("memeber count :", memberCount, "voice channel bot id", botChannelID)
+	fmt.Println(voiceConnections, players)
 }
 
 func PrintHelp(discord *discordgo.Session, message *discordgo.MessageCreate) {
