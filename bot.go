@@ -803,7 +803,7 @@ func showQueue(player *VoicePlayer) string {
 	return strings.Join(titles, "\n") // join titles with newlines
 }
 
-func ShowPlayStatsForInteraction(discord *discordgo.Session, message *discordgo.InteractionCreate, db *sql.DB) {
+func ShowPlayStatsForInteraction(discord *discordgo.Session, message *discordgo.InteractionCreate, db *sql.DB) string {
 	var songs []crud.Song_counter
 	var err error
 	songs, err = crud.ReadAllPlayedCountForSongInServer(message.GuildID, db)
@@ -828,12 +828,7 @@ func ShowPlayStatsForInteraction(discord *discordgo.Session, message *discordgo.
 	result := sb.String()
 	fmt.Println(result)
 
-	discord.InteractionRespond(message.Interaction, &discordgo.InteractionResponse{
-		Type: discordgo.InteractionResponseChannelMessageWithSource,
-		Data: &discordgo.InteractionResponseData{
-			Content: "test",
-		},
-	})
+	return result
 }
 
 func ShowPlayStats(discord *discordgo.Session, message *discordgo.MessageCreate, db *sql.DB) {
@@ -898,13 +893,13 @@ func newCommand(discord *discordgo.Session, i *discordgo.InteractionCreate, db *
 				},
 			})
 		case "stats":
+			result := ShowPlayStatsForInteraction(discord, i, db)
 			discord.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 				Type: discordgo.InteractionResponseChannelMessageWithSource,
 				Data: &discordgo.InteractionResponseData{
-					Content: "Current statistics:",
+					Content: "Current statistics: \n" + result,
 				},
 			})
-			ShowPlayStatsForInteraction(discord, i, db)
 		case "stop":
 			discord.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 				Type: discordgo.InteractionResponseChannelMessageWithSource,
