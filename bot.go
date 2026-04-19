@@ -139,49 +139,49 @@ func Run(token string, db *sql.DB) {
 }
 
 func voiceStateUpdate(s *discordgo.Session, vs *discordgo.VoiceStateUpdate) {
-// 1. Sprawdź, czy bot ma aktywne połączenie w tej gildii w Twojej mapie
-    vc, ok := voiceConnections[vs.GuildID]
-    if !ok || vc == nil {
-        return
-    }
+	// 1. Sprawdź, czy bot ma aktywne połączenie w tej gildii w Twojej mapie
+	vc, ok := voiceConnections[vs.GuildID]
+	if !ok || vc == nil {
+		return
+	}
 
-    // 2. Znajdź kanał, na którym obecnie znajduje się BOT
-    // Przeszukujemy VoiceStates gildii, aby znaleźć stan bota
-    var botChannelID string
-    guild, err := s.State.Guild(vs.GuildID)
-    if err != nil {
-        return
-    }
+	// 2. Znajdź kanał, na którym obecnie znajduje się BOT
+	// Przeszukujemy VoiceStates gildii, aby znaleźć stan bota
+	var botChannelID string
+	guild, err := s.State.Guild(vs.GuildID)
+	if err != nil {
+		return
+	}
 
-    for _, state := range guild.VoiceStates {
-        if state.UserID == s.State.User.ID {
-            botChannelID = state.ChannelID
-            break
-        }
-    }
+	for _, state := range guild.VoiceStates {
+		if state.UserID == s.State.User.ID {
+			botChannelID = state.ChannelID
+			break
+		}
+	}
 
-    // Jeśli bota nie ma na żadnym kanale, nie ma kogo liczyć
-    if botChannelID == "" {
-        return
-    }
+	// Jeśli bota nie ma na żadnym kanale, nie ma kogo liczyć
+	if botChannelID == "" {
+		return
+	}
 
-    // 3. Policz pozostałych użytkowników na tym samym kanale co bot
-    memberCount := 0
-    for _, state := range guild.VoiceStates {
-        if state.ChannelID == botChannelID && state.UserID != s.State.User.ID {
-            memberCount++
-        }
-    }
+	// 3. Policz pozostałych użytkowników na tym samym kanale co bot
+	memberCount := 0
+	for _, state := range guild.VoiceStates {
+		if state.ChannelID == botChannelID && state.UserID != s.State.User.ID {
+			memberCount++
+		}
+	}
 
-    fmt.Println("Liczba osób na kanale bota:", memberCount)
+	fmt.Println("Liczba osób na kanale bota:", memberCount)
 
-    // 4. Jeśli nikt nie został, rozłącz się
-    if memberCount == 0 {
-        fmt.Println("Kanał pusty, bot wychodzi.")
-        vc.Disconnect(context.TODO()) // lub vc.Close() w zależności od wersji
-        delete(voiceConnections, vs.GuildID)
-        delete(players, vs.GuildID)
-    }
+	// 4. Jeśli nikt nie został, rozłącz się
+	if memberCount == 0 {
+		fmt.Println("Kanał pusty, bot wychodzi.")
+		vc.Disconnect(context.TODO()) // lub vc.Close() w zależności od wersji
+		delete(voiceConnections, vs.GuildID)
+		delete(players, vs.GuildID)
+	}
 	fmt.Println("memeber count :", memberCount, "voice channel bot id", botChannelID)
 	fmt.Println(voiceConnections, players)
 }
@@ -821,7 +821,7 @@ func ShowPlayStatsForInteraction(discord *discordgo.Session, message *discordgo.
 
 	for _, song := range songs {
 		sb.WriteString(fmt.Sprintf("Song title %s was played ** %d **\n", song.Title, song.Played_counter))
-		fmt.Println(song.Title, song.Played_counter)
+		// fmt.Println(song.Title, song.Played_counter)
 	}
 	sb.WriteString("Thats it folks")
 
