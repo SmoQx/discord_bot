@@ -178,7 +178,7 @@ func voiceStateUpdate(s *discordgo.Session, vs *discordgo.VoiceStateUpdate) {
     // 4. Jeśli nikt nie został, rozłącz się
     if memberCount == 0 {
         fmt.Println("Kanał pusty, bot wychodzi.")
-        vc.Disconnect() // lub vc.Close() w zależności od wersji
+        vc.Disconnect(context.TODO()) // lub vc.Close() w zależności od wersji
         delete(voiceConnections, vs.GuildID)
         delete(players, vs.GuildID)
     }
