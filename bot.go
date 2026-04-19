@@ -165,7 +165,7 @@ func voiceStateUpdate(s *discordgo.Session, vs *discordgo.VoiceStateUpdate) {
 	}
 
 	// If no one else is left, disconnect
-	if memberCount == 0 {
+	if memberCount == 2 {
 		fmt.Println("No one left, leaving channel.")
 		vc.Disconnect(context.TODO())
 		delete(voiceConnections, vs.GuildID)
