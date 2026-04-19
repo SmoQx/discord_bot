@@ -147,7 +147,7 @@ func voiceStateUpdate(s *discordgo.Session, vs *discordgo.VoiceStateUpdate) {
 	}
 
 	// Get the channel the bot is in
-	botChannelID := vs.ChannelID
+	botChannelID := vc.ChannelID
 	// if botChannelID == "" {
 	// 	return
 	// }
