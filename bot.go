@@ -140,10 +140,6 @@ func Run(token string, db *sql.DB) {
 
 func voiceStateUpdate(s *discordgo.Session, vs *discordgo.VoiceStateUpdate) {
 	// Check if the bot is connected in this guild
-	
-	if vs.ChannelID == "" {
-		fmt.Println("vs updated")
-	}
 
 	vc, ok := voiceConnections[vs.GuildID]
 	if !ok || vc == nil {
@@ -152,9 +148,9 @@ func voiceStateUpdate(s *discordgo.Session, vs *discordgo.VoiceStateUpdate) {
 
 	// Get the channel the bot is in
 	botChannelID := vs.ChannelID
-	if botChannelID == "" {
-		return
-	}
+	// if botChannelID == "" {
+	// 	return
+	// }
 
 	// Count members in the bot's voice channel
 	guild, err := s.State.Guild(vs.GuildID)
