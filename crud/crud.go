@@ -24,6 +24,12 @@ type Kolenda struct {
 	IsKolenda bool
 }
 
+type PlayList struct {
+	SongId     string
+	PlayListId int
+	Title      string
+}
+
 func InitDatabase(db *sql.DB) {
 	_, err := db.Exec(`CREATE TABLE IF NOT EXISTS kolenda (
 		songId TEXT ,
@@ -37,6 +43,16 @@ func InitDatabase(db *sql.DB) {
 	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS users (
 		id TEXT PRIMARY KEY,
 		username TEXT
+	);`)
+
+	if err != nil {
+		fmt.Println("failed to create table:", err)
+	}
+
+	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS playlist (
+		PlayListID INTEGER,
+		SongId TEXT,
+		Title TEXT
 	);`)
 
 	if err != nil {
@@ -89,6 +105,46 @@ func GetKolenda(db *sql.DB) ([]Song_counter, error) {
 	}
 
 	return songs, nil
+}
+
+func GetPlayList(db *sql.DB, id string) ([]Song_counter, error) {
+	rows, err := db.Query(`
+	SELECT 
+		* 
+	FROM 
+		songs s 
+	JOIN 
+		playlist l
+	ON
+		s.id = l.SongId
+	WHERE
+		l.PlayListID = ?
+	`, id)
+
+	if err != nil {
+		fmt.Println("There was an error reading songs which are in this playlist", err)
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	var songs []Song_counter
+
+	for rows.Next() {
+		var song Song_counter
+		err = rows.Scan(&song.Id, &song.Title, &song.Server, &song.Played_counter)
+		if err != nil {
+			fmt.Println(err)
+		}
+		fmt.Printf("ID=%s, Title=%s, Server=%s, Played_counter=%d\n", song.Id, song.Title, song.Server, song.Played_counter)
+		songs = append(songs, song)
+	}
+
+	return songs, nil
+}
+
+func GetPlayLists(db *sql.DB) ([]string, error) {
+	return []string{"Listy", "lsit"}, nil
 }
 
 func InsertUserIntoDatabase(username string, user_id string, db *sql.DB) error {

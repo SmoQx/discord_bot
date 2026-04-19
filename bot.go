@@ -123,6 +123,18 @@ func Run(token string, db *sql.DB) {
 			Name:        "kolendy",
 			Description: "Plays kolendy none stop",
 		},
+		{
+			Name:        "playlista",
+			Description: "Play from playlist",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "id",
+					Description: "Playlist Id",
+					Required:    true,
+				},
+			},
+		},
 	}
 
 	for _, cmd := range commands {
@@ -188,13 +200,14 @@ func voiceStateUpdate(s *discordgo.Session, vs *discordgo.VoiceStateUpdate) {
 
 func PrintHelp(discord *discordgo.Session, message *discordgo.MessageCreate) {
 	message_text := `This message is shown when you need help:
-!queue - list ququeue
-!join - bot joins
-!skip - skips current song
-!stop - stops the bot
-!leave - bot leaves
-!help - showes this message
-!stats - for servers songs statistics`
+/queue - list ququeue
+/join - bot joins
+/skip - skips current song
+/stop - stops the bot
+/leave - bot leaves
+/help - showes this message
+/stats - for servers songs statistics
+/playlista - play selected playlist`
 	discord.ChannelMessageSend(message.ChannelID, message_text)
 }
 
@@ -240,6 +253,10 @@ func JoinServerFromCommand(discord *discordgo.Session, i *discordgo.InteractionC
 
 	voiceConnections[i.GuildID] = vc
 	discord.ChannelMessageSend(i.ChannelID, "Joined your voice channel!")
+}
+
+func PlayPlaylistFromInteraction(discord *discordgo.Session, i *discordgo.InteractionCreate, id string) {
+
 }
 
 func LeaveServerForInteraction(discord *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -863,14 +880,14 @@ func newCommand(discord *discordgo.Session, i *discordgo.InteractionCreate, db *
 		switch i.ApplicationCommandData().Name {
 		case "help":
 			message_text := `This message is shown when you need help:
-!queue - list ququeue
-!join - bot joins
-!skip - skips current song
-!stop - stops the bot
-!leave - bot leaves
-!help - showes this message
-!stats - for servers songs statistics
-!kolenda - plays klocuch on loop`
+/queue - list ququeue
+/join - bot joins
+/skip - skips current song
+/stop - stops the bot
+/leave - bot leaves
+/help - showes this message
+/stats - for servers songs statistics
+/playlista - play selected playlist`
 			discord.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 				Type: discordgo.InteractionResponseChannelMessageWithSource,
 				Data: &discordgo.InteractionResponseData{
@@ -897,7 +914,7 @@ func newCommand(discord *discordgo.Session, i *discordgo.InteractionCreate, db *
 			discord.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 				Type: discordgo.InteractionResponseChannelMessageWithSource,
 				Data: &discordgo.InteractionResponseData{
-					Content: "Current statistics: \n" + result,
+					Content: result,
 				},
 			})
 		case "stop":
@@ -936,6 +953,64 @@ func newCommand(discord *discordgo.Session, i *discordgo.InteractionCreate, db *
 				},
 			})
 			JoinServerFromCommand(discord, i)
+		case "playlista":
+			crud.InitDatabase(db)
+			discord.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: "I will get the playlist soon",
+				},
+			})
+			query := i.ApplicationCommandData().Options[0].StringValue()
+
+			vs, err := findUserVoiceState(discord, i.GuildID, i.Member.User.ID)
+
+			if err != nil {
+				discord.FollowupMessageCreate(i.Interaction, false, &discordgo.WebhookParams{
+					Content: "Something went wrong i cannot find you",
+				})
+			}
+
+			if _, ok := voiceConnections[vs.GuildID]; !ok {
+				JoinServerFromCommand(discord, i)
+			}
+
+			var songs []Song
+			var playlista []crud.Song_counter
+
+			playlista, err = crud.GetPlayList(db, query)
+
+			if err != nil {
+				discord.FollowupMessageCreate(i.Interaction, false, &discordgo.WebhookParams{
+					Content: "Oj amigo cannot find any songs",
+				})
+			}
+
+			for _, p := range playlista {
+				var song = Song{Filename: p.Id, Title: p.Title}
+				songs = append(songs, song)
+			}
+
+			player, ok := players[vs.GuildID]
+			if !ok {
+				player = &VoicePlayer{
+					VC:          voiceConnections[vs.GuildID],
+					Queue:       []Song{},
+					AutoAdvance: true,
+				}
+				players[vs.GuildID] = player
+			}
+
+			if player.Playing {
+				for _, p := range songs {
+					player.Queue = append(player.Queue, p)
+				}
+			} else {
+				player.Queue = songs[1:]
+
+				go PlayMusicFromInteraction(player, songs[0], discord, i)
+			}
+
 		case "kolenda":
 			crud.InitDatabase(db)
 			discord.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
