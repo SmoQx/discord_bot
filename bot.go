@@ -120,10 +120,6 @@ func Run(token string, db *sql.DB) {
 			Description: "Skips currently playing song",
 		},
 		{
-			Name:        "kolendy",
-			Description: "Plays kolendy none stop",
-		},
-		{
 			Name:        "playlista",
 			Description: "Play from playlist",
 			Options: []*discordgo.ApplicationCommandOption{
@@ -134,6 +130,10 @@ func Run(token string, db *sql.DB) {
 					Required:    true,
 				},
 			},
+		},
+		{
+			Name:        "kolendy",
+			Description: "Plays kolendy none stop",
 		},
 	}
 
