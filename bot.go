@@ -140,6 +140,11 @@ func Run(token string, db *sql.DB) {
 
 func voiceStateUpdate(s *discordgo.Session, vs *discordgo.VoiceStateUpdate) {
 	// Check if the bot is connected in this guild
+	
+	if vs.ChannelID == "" {
+		fmt.Println("vs updated")
+	}
+
 	vc, ok := voiceConnections[vs.GuildID]
 	if !ok || vc == nil {
 		return
