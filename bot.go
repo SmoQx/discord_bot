@@ -821,7 +821,7 @@ func ShowPlayStatsForInteraction(discord *discordgo.Session, message *discordgo.
 
 	for _, song := range songs {
 		sb.WriteString(fmt.Sprintf("Song title %s was played ** %d **\n", song.Title, song.Played_counter))
-		// fmt.Println(song.Title, song.Played_counter)
+		fmt.Println(song.Title, song.Played_counter)
 	}
 	sb.WriteString("Thats it folks")
 
@@ -831,7 +831,7 @@ func ShowPlayStatsForInteraction(discord *discordgo.Session, message *discordgo.
 	discord.InteractionRespond(message.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
-			Content: result,
+			Content: "test",
 		},
 	})
 }
