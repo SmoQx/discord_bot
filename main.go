@@ -15,6 +15,8 @@ func main() {
 
 	crud.InitDatabase(db)
 
+	RunServer(db)
+
 	// crud.Test()
 	MainBOT(db)
 }
