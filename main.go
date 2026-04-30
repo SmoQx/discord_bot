@@ -14,9 +14,9 @@ func main() {
 	defer db.Close()
 
 	crud.InitDatabase(db)
+	// crud.Test()
 
 	RunServer(db)
 
-	// crud.Test()
-	MainBOT(db)
+	// MainBOT(db)
 }

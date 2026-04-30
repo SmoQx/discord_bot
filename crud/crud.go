@@ -13,15 +13,21 @@ type User struct {
 }
 
 type Song_counter struct {
-	Id             string
-	Title          string
-	Server         string
-	Played_counter int
+	Id             string `json:"id"`
+	Title          string `json:"title"`
+	Server         string `json:"server"`
+	Played_counter int    `json:"played_counter"`
 }
 
 type Kolenda struct {
 	SongId    string
 	IsKolenda bool
+}
+
+type PlaylistReturn struct {
+	PlayListId     int      `json:"id"`
+	PlayListTitile string   `json:"title"`
+	SongsId        []string `json:"songs"`
 }
 
 type PlayList struct {
@@ -69,6 +75,36 @@ func InitDatabase(db *sql.DB) {
 	if err != nil {
 		fmt.Println("failed to create table:", err)
 	}
+}
+
+func GetSongs(db *sql.DB) ([]Song_counter, error) {
+	rows, err := db.Query(`
+	SELECT 
+		* 
+	FROM 
+		songs s 
+	`)
+
+	if err != nil {
+		fmt.Println("There was an error reading songs", err)
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	var songs []Song_counter
+
+	for rows.Next() {
+		var song Song_counter
+		err = rows.Scan(&song.Id, &song.Title, &song.Server, &song.Played_counter)
+		if err != nil {
+			fmt.Println(err)
+		}
+		fmt.Printf("ID=%s, Title=%s, Server=%s, Played_counter=%d\n", song.Id, song.Title, song.Server, song.Played_counter)
+		songs = append(songs, song)
+	}
+
+	return songs, nil
 }
 
 func GetKolenda(db *sql.DB) ([]Song_counter, error) {
@@ -143,8 +179,44 @@ func GetPlayList(db *sql.DB, id string) ([]Song_counter, error) {
 	return songs, nil
 }
 
-func GetPlayLists(db *sql.DB) ([]string, error) {
-	return []string{"Listy", "lsit"}, nil
+func GetPlayLists(db *sql.DB) ([]PlaylistReturn, error) {
+	rows, err := db.Query(`SELECT playlist_id, title, song_id FROM playlist`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	// map to group songs under their playlist id
+	playlistMap := make(map[int]*PlaylistReturn)
+	// slice to preserve insertion order
+	var order []int
+
+	for rows.Next() {
+		var p PlayList
+		err = rows.Scan(&p.PlayListId, &p.Title, &p.SongId)
+		if err != nil {
+			return nil, err
+		}
+
+		if _, exists := playlistMap[p.PlayListId]; !exists {
+			playlistMap[p.PlayListId] = &PlaylistReturn{
+				PlayListId:     p.PlayListId,
+				PlayListTitile: p.Title,
+				SongsId:        []string{},
+			}
+			order = append(order, p.PlayListId)
+		}
+
+		playlistMap[p.PlayListId].SongsId = append(playlistMap[p.PlayListId].SongsId, p.SongId)
+	}
+
+	// flatten map into ordered slice
+	playlists := make([]PlaylistReturn, 0, len(order))
+	for _, id := range order {
+		playlists = append(playlists, *playlistMap[id])
+	}
+
+	return playlists, nil
 }
 
 func InsertUserIntoDatabase(username string, user_id string, db *sql.DB) error {
