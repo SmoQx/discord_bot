@@ -179,6 +179,22 @@ func GetPlayList(db *sql.DB, id string) ([]Song_counter, error) {
 	return songs, nil
 }
 
+func ChangePlaylistName(db *sql.DB, playlistID int, newName string) error {
+	// Update plalist name for selectd playlsit id change it to the name of newName value
+	fmt.Println(playlistID, newName)
+	if newName == "" {
+		return fmt.Errorf("New name is empty")
+	}
+
+	_, err := db.Exec(`UPDATE playlist SET Title = ? WHERE PlayListID = ?`, newName, playlistID)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func GetPlayLists(db *sql.DB) ([]PlaylistReturn, error) {
 	rows, err := db.Query(`SELECT PlayListID, Title, SongId FROM playlist`)
 	if err != nil {

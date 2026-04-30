@@ -2197,12 +2197,31 @@
             renderEditTracks(pl);
         }
 
-        function savePlaylist() {
-            const pl = playlists.find(p => p.id === editingPlaylistId);
-            pl.title = document.getElementById('editPlaylistName').value.trim() || pl.title;
-            renderPlaylists();
-            closeModal('editPlaylistModal');
-            toast(`Playlist saved`, 'success');
+        async function savePlaylist() {
+            const newName = document.getElementById('editPlaylistName').value.trim();
+            if (!newName) return;
+
+            try {
+                const res = await fetch(`${API}/api/updatePlaylistName`, {
+                    method: 'PATCH',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        playlist_id: editingPlaylistId,
+                        title: newName        // ← from the input, not pl.title
+                    })
+                });
+
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+                // update local array only after successful save
+                const pl = playlists.find(p => p.id === editingPlaylistId);
+                pl.title = newName;
+                renderPlaylists();
+                closeModal('editPlaylistModal');
+                toast('Playlist saved', 'success');
+            } catch (err) {
+                pushMsg('SYSTEM', `Failed to save playlist: ${err.message}`, 'system');
+            }
         }
 
         function deletePlaylist() {

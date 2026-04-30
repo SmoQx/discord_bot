@@ -31,12 +31,24 @@ func GetPlaylists(ctx *gin.Context, db *sql.DB) {
 	ctx.JSON(http.StatusOK, playlists)
 }
 
+func ChangePlaylistName(ctx *gin.Context, db *sql.DB, playlistID int, newName string) {
+	err := crud.ChangePlaylistName(db, playlistID, newName)
+
+	fmt.Println(err)
+
+	if err != nil {
+		ctx.JSON(http.StatusNotFound, err)
+	}
+
+	ctx.JSON(http.StatusOK, nil)
+}
+
 func RunServer(db *sql.DB) {
 
 	router := gin.Default()
 	router.Use(func(c *gin.Context) {
 		c.Header("Access-Control-Allow-Origin", "*")
-		c.Header("Access-Control-Allow-Methods", "GET, PUT, POST, DELETE, OPTIONS")
+		c.Header("Access-Control-Allow-Methods", "GET, PUT, POST, DELETE, OPTIONS, PATCH")
 		c.Header("Access-Control-Allow-Headers", "Content-Type")
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(http.StatusNoContent)
@@ -58,6 +70,19 @@ func RunServer(db *sql.DB) {
 
 	router.GET("/api/playlists", func(ctx *gin.Context) {
 		GetPlaylists(ctx, db)
+	})
+
+	router.PATCH("/api/updatePlaylistName", func(ctx *gin.Context) {
+		var body struct {
+			PlaylistId int    `json:"playlist_id"`
+			NewName    string `json:"title"`
+		}
+		if err := ctx.ShouldBindJSON(&body); err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		ChangePlaylistName(ctx, db, body.PlaylistId, body.NewName)
 	})
 
 	router.Run("127.0.0.1:8080")
