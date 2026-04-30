@@ -179,6 +179,18 @@ func GetPlayList(db *sql.DB, id string) ([]Song_counter, error) {
 	return songs, nil
 }
 
+func RemoveSongFromPlaylist(db *sql.DB, playlistId int, songId int) error {
+	return nil
+}
+
+func AddSongToPlaylist(db *sql.DB, playlistId int, songId int) error {
+	return nil
+}
+
+func CreatePlaylist(db *sql.DB, playlistId int, playlistTitle string) error {
+	return nil
+}
+
 func ChangePlaylistName(db *sql.DB, playlistID int, newName string) error {
 	// Update plalist name for selectd playlsit id change it to the name of newName value
 	fmt.Println(playlistID, newName)
