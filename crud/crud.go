@@ -180,7 +180,7 @@ func GetPlayList(db *sql.DB, id string) ([]Song_counter, error) {
 }
 
 func GetPlayLists(db *sql.DB) ([]PlaylistReturn, error) {
-	rows, err := db.Query(`SELECT playlist_id, title, song_id FROM playlist`)
+	rows, err := db.Query(`SELECT PlayListID, Title, SongId FROM playlist`)
 	if err != nil {
 		return nil, err
 	}

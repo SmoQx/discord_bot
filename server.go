@@ -20,13 +20,13 @@ func GetSongs(ctx *gin.Context, db *sql.DB) {
 }
 
 func GetPlaylists(ctx *gin.Context, db *sql.DB) {
-	playlists, _ := crud.GetPlayLists(db)
+	playlists, err := crud.GetPlayLists(db)
 
 	fmt.Println(playlists)
 
-	// if err != nil {
-	// 	ctx.JSON(http.StatusNotFound, nil)
-	// }
+	if err != nil {
+		ctx.JSON(http.StatusNotFound, nil)
+	}
 
 	ctx.JSON(http.StatusOK, playlists)
 }
