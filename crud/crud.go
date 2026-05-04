@@ -40,7 +40,7 @@ func InitDatabase(db *sql.DB) {
 	_, err := db.Exec(`CREATE TABLE IF NOT EXISTS kolenda (
 		songId TEXT ,
 		isKolenda BOOLEAN
-	);`)
+		);`)
 
 	if err != nil {
 		fmt.Println("failed to create table:", err)
@@ -49,7 +49,7 @@ func InitDatabase(db *sql.DB) {
 	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS users (
 		id TEXT PRIMARY KEY,
 		username TEXT
-	);`)
+		);`)
 
 	if err != nil {
 		fmt.Println("failed to create table:", err)
@@ -59,7 +59,7 @@ func InitDatabase(db *sql.DB) {
 		PlayListID INTEGER,
 		SongId TEXT,
 		Title TEXT
-	);`)
+		);`)
 
 	if err != nil {
 		fmt.Println("failed to create table:", err)
@@ -70,7 +70,7 @@ func InitDatabase(db *sql.DB) {
 		title TEXT,
 		server TEXT,
 		played_counter INTEGER
-	);`)
+		);`)
 
 	if err != nil {
 		fmt.Println("failed to create table:", err)
@@ -79,11 +79,11 @@ func InitDatabase(db *sql.DB) {
 
 func GetSongs(db *sql.DB) ([]Song_counter, error) {
 	rows, err := db.Query(`
-	SELECT 
-		* 
-	FROM 
-		songs s 
-	`)
+		SELECT 
+			* 
+		FROM 
+			songs s 
+		`)
 
 	if err != nil {
 		fmt.Println("There was an error reading songs", err)
@@ -109,17 +109,17 @@ func GetSongs(db *sql.DB) ([]Song_counter, error) {
 
 func GetKolenda(db *sql.DB) ([]Song_counter, error) {
 	rows, err := db.Query(`
-	SELECT 
-		* 
-	FROM 
-		songs s 
-	JOIN 
-		kolenda k
-	ON
-		a.id = k.songId
-	WHERE
-		k.isKolenda = true
-	`)
+		SELECT 
+			* 
+		FROM 
+			songs s 
+		JOIN 
+			kolenda k
+		ON
+			a.id = k.songId
+		WHERE
+			k.isKolenda = true
+		`)
 
 	if err != nil {
 		fmt.Println("There was an error reading songs which are kolendas", err)
@@ -145,17 +145,17 @@ func GetKolenda(db *sql.DB) ([]Song_counter, error) {
 
 func GetPlayList(db *sql.DB, id string) ([]Song_counter, error) {
 	rows, err := db.Query(`
-	SELECT 
-		* 
-	FROM 
-		songs s 
-	JOIN 
-		playlist l
-	ON
-		s.id = l.SongId
-	WHERE
-		l.PlayListID = ?
-	`, id)
+		SELECT 
+			* 
+		FROM 
+			songs s 
+		JOIN 
+			playlist l
+		ON
+			s.id = l.SongId
+		WHERE
+			l.PlayListID = ?
+		`, id)
 
 	if err != nil {
 		fmt.Println("There was an error reading songs which are in this playlist", err)
@@ -180,10 +180,40 @@ func GetPlayList(db *sql.DB, id string) ([]Song_counter, error) {
 }
 
 func RemoveSongFromPlaylist(db *sql.DB, playlistId int, songId int) error {
+	_, err := db.Exec(`
+		DELETE 
+		FROM 
+			playlist as p 
+		WHERE 
+			p.SongId = ? 
+		AND 
+			p.PlayListID = ?
+		`, songId, playlistId)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
 func AddSongToPlaylist(db *sql.DB, playlistId int, songId int) error {
+	_, err := db.Exec(`
+		INSERT INTO 
+			playlist (PlayListID, SongId , Title ) 
+			VALUES
+				(?, ?, ( 
+				SELECT 
+					Title 
+				FROM 
+					playlist p 
+				WHERE 
+					p.PlayListID = ? 
+				LIMIT 
+					1 
+			)
+		)`, playlistId, songId, playlistId)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -198,7 +228,14 @@ func ChangePlaylistName(db *sql.DB, playlistID int, newName string) error {
 		return fmt.Errorf("New name is empty")
 	}
 
-	_, err := db.Exec(`UPDATE playlist SET Title = ? WHERE PlayListID = ?`, newName, playlistID)
+	_, err := db.Exec(`
+		UPDATE 
+			playlist 
+		SET 
+			Title = ? 
+		WHERE 
+			PlayListID = ?
+		`, newName, playlistID)
 
 	if err != nil {
 		return err
@@ -208,7 +245,11 @@ func ChangePlaylistName(db *sql.DB, playlistID int, newName string) error {
 }
 
 func GetPlayLists(db *sql.DB) ([]PlaylistReturn, error) {
-	rows, err := db.Query(`SELECT PlayListID, Title, SongId FROM playlist`)
+	rows, err := db.Query(`
+		SELECT
+			PlayListID, Title, SongId 
+		FROM 
+			playlist`)
 	if err != nil {
 		return nil, err
 	}
@@ -252,7 +293,13 @@ func InsertUserIntoDatabase(username string, user_id string, db *sql.DB) error {
 		return fmt.Errorf("Username is empyt")
 	}
 
-	_, err := db.Exec(`INSERT INTO users (id, username) VALUES (?, ?)`, user_id, username)
+	_, err := db.Exec(`
+		INSERT 
+		INTO 
+			users (id, username) 
+		VALUES 
+			(?, ?)
+		`, user_id, username)
 
 	return err
 }
@@ -261,19 +308,41 @@ func InsertSongIntoDatabase(song_id string, song_title string, server string, db
 	if song_id == "" || song_title == "" {
 		return fmt.Errorf("Username is empty")
 	}
-	_, err := db.Exec(`INSERT INTO songs (id, title, played_counter, server) VALUES (?, ?, 0, ?)`, song_id, song_title, server)
+	_, err := db.Exec(`
+		INSERT 
+		INTO 
+			songs (id, title, played_counter, server) 
+		VALUES 
+			(?, ?, 0, ?)
+		`, song_id, song_title, server)
 
 	return err
 }
 
 func UpdateSongsPlayCount(song_id string, server string, db *sql.DB) {
-	_, err := db.Exec("UPDATE songs SET played_counter = played_counter + 1 WHERE id = ? and server = ?", song_id, server)
+	_, err := db.Exec(`
+		UPDATE 
+			songs 
+		SET 
+			played_counter = played_counter + 1 
+		WHERE 
+			id = ? 
+		AND 
+			server = ?
+		`, song_id, server)
 	if err != nil {
 		fmt.Println("Update:", err)
 	}
 }
 func ReadPlayedCountForSong(song_id string, db *sql.DB) ([]Song_counter, error) {
-	rows, err := db.Query("SELECT title, played_counter FROM songs WHERE id = ? ", song_id)
+	rows, err := db.Query(`
+		SELECT 
+			title, played_counter 
+		FROM 
+			songs 
+		WHERE 
+			id = ? 
+		`, song_id)
 	if err != nil {
 		fmt.Println("Select:", err)
 		return nil, err
@@ -293,7 +362,15 @@ func ReadPlayedCountForSong(song_id string, db *sql.DB) ([]Song_counter, error) 
 }
 
 func ReadAllPlayedCountForSong(db *sql.DB) ([]Song_counter, error) {
-	rows, err := db.Query("select s.title, s.played_counter  from songs s order by s.played_counter desc")
+	rows, err := db.Query(`
+		select 
+			s.title, s.played_counter  
+		from 
+			songs s 
+		order by 
+			s.played_counter 
+		desc
+		`)
 	if err != nil {
 		fmt.Println("Select:", err)
 		return nil, err
@@ -314,7 +391,19 @@ func ReadAllPlayedCountForSong(db *sql.DB) ([]Song_counter, error) {
 }
 
 func ReadAllPlayedCountForSongInServer(server_name string, db *sql.DB) ([]Song_counter, error) {
-	rows, err := db.Query("SELECT title, played_counter FROM songs WHERE server = ? order by played_counter desc limit 10", server_name)
+	rows, err := db.Query(`
+		SELECT 
+			title, played_counter 
+		FROM 
+			songs 
+		WHERE 
+			server = ? 
+		order by 
+			played_counter 
+		desc 
+		limit 
+			10
+		`, server_name)
 	if err != nil {
 		fmt.Println("Select:", err)
 		return nil, err
@@ -335,7 +424,12 @@ func ReadAllPlayedCountForSongInServer(server_name string, db *sql.DB) ([]Song_c
 }
 
 func ReadAllUsers(db *sql.DB) ([]User, error) {
-	rows, err := db.Query("SELECT id, username FROM users")
+	rows, err := db.Query(`
+		SELECT 
+			id, username 
+		FROM 
+			users
+		`)
 	if err != nil {
 		fmt.Println("Select:", err)
 		return nil, err
