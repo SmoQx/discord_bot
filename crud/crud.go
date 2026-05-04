@@ -179,7 +179,7 @@ func GetPlayList(db *sql.DB, id string) ([]Song_counter, error) {
 	return songs, nil
 }
 
-func RemoveSongFromPlaylist(db *sql.DB, playlistId int, songId int) error {
+func RemoveSongFromPlaylist(db *sql.DB, playlistId int, songId string) error {
 	_, err := db.Exec(`
 		DELETE 
 		FROM 
@@ -195,7 +195,7 @@ func RemoveSongFromPlaylist(db *sql.DB, playlistId int, songId int) error {
 	return nil
 }
 
-func AddSongToPlaylist(db *sql.DB, playlistId int, songId int) error {
+func AddSongToPlaylist(db *sql.DB, playlistId int, songId string) error {
 	_, err := db.Exec(`
 		INSERT INTO 
 			playlist (PlayListID, SongId , Title ) 

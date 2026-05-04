@@ -43,6 +43,30 @@ func ChangePlaylistName(ctx *gin.Context, db *sql.DB, playlistID int, newName st
 	ctx.JSON(http.StatusOK, nil)
 }
 
+func RemoveSongFromPlaylist(ctx *gin.Context, db *sql.DB, playlistID int, songId string) {
+	err := crud.RemoveSongFromPlaylist(db, playlistID, songId)
+
+	fmt.Println(err)
+
+	if err != nil {
+		ctx.JSON(http.StatusNotFound, err)
+	}
+
+	ctx.JSON(http.StatusOK, nil)
+}
+
+func AddSongToPlaylist(ctx *gin.Context, db *sql.DB, playlistID int, songId string) {
+	err := crud.AddSongToPlaylist(db, playlistID, songId)
+
+	fmt.Println(err)
+
+	if err != nil {
+		ctx.JSON(http.StatusNotFound, err)
+	}
+
+	ctx.JSON(http.StatusOK, nil)
+}
+
 func RunServer(db *sql.DB) {
 
 	router := gin.Default()
@@ -83,6 +107,32 @@ func RunServer(db *sql.DB) {
 		}
 
 		ChangePlaylistName(ctx, db, body.PlaylistId, body.NewName)
+	})
+
+	router.DELETE("/api/removeSongFromPlaylist", func(ctx *gin.Context) {
+		var body struct {
+			PlaylistId int    `json:"playlist_id"`
+			SongId     string `json:"song_id"`
+		}
+		if err := ctx.ShouldBindJSON(&body); err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		RemoveSongFromPlaylist(ctx, db, body.PlaylistId, body.SongId)
+	})
+
+	router.POST("/api/removeSongFromPlaylist", func(ctx *gin.Context) {
+		var body struct {
+			PlaylistId int    `json:"playlist_id"`
+			SongId     string `json:"song_id"`
+		}
+		if err := ctx.ShouldBindJSON(&body); err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		AddSongToPlaylist(ctx, db, body.PlaylistId, body.SongId)
 	})
 
 	router.Run("127.0.0.1:8080")
