@@ -80,7 +80,10 @@ func InitDatabase(db *sql.DB) {
 func GetSongs(db *sql.DB) ([]Song_counter, error) {
 	rows, err := db.Query(`
 		SELECT 
-			* 
+			id,
+			title,
+			server,
+			played_counter
 		FROM 
 			songs s 
 		`)
@@ -217,7 +220,29 @@ func AddSongToPlaylist(db *sql.DB, playlistId int, songId string) error {
 	return nil
 }
 
-func CreatePlaylist(db *sql.DB, playlistId int, playlistTitle string) error {
+func CreatePlaylist(db *sql.DB, playlistTitle string) error {
+	_, err := db.Exec(`
+		INSERT
+		INTO
+			playlist(
+				title,
+				playlistid,
+				songid
+			) 
+		VALUES(
+			?,
+			(SELECT 
+				ifnull(max(p.PlayListID), 0) 
+			FROM 
+				playlist p ) + 1,
+			0
+		)
+		`, playlistTitle)
+
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -244,12 +269,29 @@ func ChangePlaylistName(db *sql.DB, playlistID int, newName string) error {
 	return nil
 }
 
+func RemovePlaylist(db *sql.DB, playlistId int) error {
+	_, err := db.Exec(`
+		DELETE
+		FROM
+			playlist 
+		WHERE 
+			PlayListID = ?
+		`, playlistId)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func GetPlayLists(db *sql.DB) ([]PlaylistReturn, error) {
 	rows, err := db.Query(`
 		SELECT
 			PlayListID, Title, SongId 
 		FROM 
-			playlist`)
+			playlist
+		`)
 	if err != nil {
 		return nil, err
 	}

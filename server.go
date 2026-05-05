@@ -43,6 +43,30 @@ func ChangePlaylistName(ctx *gin.Context, db *sql.DB, playlistID int, newName st
 	ctx.JSON(http.StatusOK, nil)
 }
 
+func CreatePlaylist(ctx *gin.Context, db *sql.DB, title string) {
+	err := crud.CreatePlaylist(db, title)
+
+	fmt.Println(err)
+
+	if err != nil {
+		ctx.JSON(http.StatusNotFound, err)
+	}
+
+	ctx.JSON(http.StatusOK, nil)
+}
+
+func RemovePlaylist(ctx *gin.Context, db *sql.DB, playlistId int) {
+	err := crud.RemovePlaylist(db, playlistId)
+
+	fmt.Println(err)
+
+	if err != nil {
+		ctx.JSON(http.StatusNotFound, err)
+	}
+
+	ctx.JSON(http.StatusOK, nil)
+}
+
 func RemoveSongFromPlaylist(ctx *gin.Context, db *sql.DB, playlistID int, songId string) {
 	err := crud.RemoveSongFromPlaylist(db, playlistID, songId)
 
@@ -96,6 +120,18 @@ func RunServer(db *sql.DB) {
 		GetPlaylists(ctx, db)
 	})
 
+	router.GET("/api/searchYT", func(ctx *gin.Context) {
+		ctx.JSON(http.StatusOK, gin.H{"status": "ok"})
+	})
+
+	router.GET("/api/queue", func(ctx *gin.Context) {
+		ctx.JSON(http.StatusOK, gin.H{"status": "ok"})
+	})
+
+	router.GET("/api/currentlyPlaying", func(ctx *gin.Context) {
+		ctx.JSON(http.StatusOK, gin.H{"status": "ok"})
+	})
+
 	router.PATCH("/api/updatePlaylistName", func(ctx *gin.Context) {
 		var body struct {
 			PlaylistId int    `json:"playlist_id"`
@@ -122,7 +158,7 @@ func RunServer(db *sql.DB) {
 		RemoveSongFromPlaylist(ctx, db, body.PlaylistId, body.SongId)
 	})
 
-	router.POST("/api/removeSongFromPlaylist", func(ctx *gin.Context) {
+	router.POST("/api/addSongToPlaylist", func(ctx *gin.Context) {
 		var body struct {
 			PlaylistId int    `json:"playlist_id"`
 			SongId     string `json:"song_id"`
@@ -133,6 +169,31 @@ func RunServer(db *sql.DB) {
 		}
 
 		AddSongToPlaylist(ctx, db, body.PlaylistId, body.SongId)
+	})
+
+	router.POST("/api/createPlaylist", func(ctx *gin.Context) {
+		var body struct {
+			Title string `json:"title"`
+		}
+		if err := ctx.ShouldBindJSON(&body); err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		CreatePlaylist(ctx, db, body.Title)
+	})
+
+	router.DELETE("/api/removePlaylist", func(ctx *gin.Context) {
+		var body struct {
+			PlaylistId int `json:"playlist_id"`
+		}
+
+		if err := ctx.ShouldBindJSON(&body); err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		RemovePlaylist(ctx, db, body.PlaylistId)
 	})
 
 	router.Run("127.0.0.1:8080")

@@ -1833,6 +1833,7 @@
                 const res = await fetch(`${API}/api/songs`);
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 songs = await res.json();
+                console.log(songs)
                 renderSongs();
                 renderTopSongs();
             } catch (err) {
@@ -1858,8 +1859,8 @@
             }
         }
 
-        let queue = ["s2", "s3", "s4", "s5"];
-        let currentSongId = "s1";
+        let queue = [];
+        let currentSongId = "";
         let isPlaying = true;
         let isShuffle = false;
         let isLoop = false;
@@ -2157,13 +2158,26 @@
             openModal('createPlaylistModal');
         }
 
-        function createPlaylist() {
+        async function createPlaylist() {
             const name = document.getElementById('newPlaylistName').value.trim();
             if (!name) return;
-            playlists.push({id: nextPlaylistId++, title: name, songs: []});
-            renderPlaylists();
-            closeModal('createPlaylistModal');
-            toast(`Playlist "${name}" created`, 'success');
+
+            try {
+                const res = await fetch(`${API}/api/createPlaylist`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        title: name
+                    })
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+                closeModal('createPlaylistModal');
+                toast(`Playlist "${name}" created`, 'success');
+                renderPlaylists();
+            } catch (err) {
+                pushMsg('SYSTEM', `Failed to create playlist: ${err.message}`, 'system');
+            }
         }
 
         function openEditPlaylist(id) {
@@ -2191,10 +2205,26 @@
             }).join('');
         }
 
-        function removeFromPlaylist(sid) {
+        async function removeFromPlaylist(sid) {
             const pl = playlists.find(p => p.id === editingPlaylistId);
-            pl.songs = pl.songs.filter(s => s !== sid);
-            renderEditTracks(pl);
+
+            try {
+                const res = await fetch(`${API}/api/removeSongFromPlaylist`, {
+                    method: 'DELETE',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        playlist_id: editingPlaylistId,
+                        song_id: sid
+                    })
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+                pl.songs = pl.songs.filter(s => s !== sid);
+                renderEditTracks(pl);
+                toast('Song removed from playlist', 'success');
+            } catch (err) {
+                pushMsg('SYSTEM', `Failed to remove song: ${err.message}`, 'system');
+            }
         }
 
         async function savePlaylist() {
@@ -2224,11 +2254,24 @@
             }
         }
 
-        function deletePlaylist() {
-            playlists = playlists.filter(p => p.id !== editingPlaylistId);
-            renderPlaylists();
-            closeModal('editPlaylistModal');
-            toast('Playlist deleted', 'info');
+        async function deletePlaylist() {
+            try {
+                const res = await fetch(`${API}/api/removePlaylist`, {
+                    method: 'DELETE',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        playlist_id: editingPlaylistId  // capital I to match your Go struct tag
+                    })
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+                playlists = playlists.filter(p => p.id !== editingPlaylistId);
+                renderPlaylists();
+                closeModal('editPlaylistModal');
+                toast('Playlist deleted', 'info');
+            } catch (err) {
+                pushMsg('SYSTEM', `Failed to delete playlist: ${err.message}`, 'system');
+            }
         }
 
         function queuePlaylist(id) {
@@ -2261,15 +2304,33 @@
             openModal('addToPlaylistModal');
         }
 
-        function addSongToPlaylist(plId) {
+        async function addSongToPlaylist(plId) {
             const pl = playlists.find(p => p.id === plId);
-            if (!pl.songs.includes(addToPlaylistSongId)) {
+
+            if (pl.songs.includes(addToPlaylistSongId)) {
+                toast('Already in this playlist', 'info');
+                closeModal('addToPlaylistModal');
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API}/api/addSongToPlaylist`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        playlist_id: plId,
+                        song_id: addToPlaylistSongId
+                    })
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
                 pl.songs.push(addToPlaylistSongId);
                 renderPlaylists();
                 toast(`Added to "${pl.title}"`, 'success');
-            } else {
-                toast('Already in this playlist', 'info');
+            } catch (err) {
+                pushMsg('SYSTEM', `Failed to add song: ${err.message}`, 'system');
             }
+
             closeModal('addToPlaylistModal');
         }
 
