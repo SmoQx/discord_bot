@@ -92,6 +92,18 @@ func Run(token string, db *sql.DB) {
 			},
 		},
 		{
+			Name:        "playlista",
+			Description: "Play from playlist",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "query",
+					Description: "Playlist Id",
+					Required:    true,
+				},
+			},
+		},
+		{
 			Name:        "join",
 			Description: "Join the server",
 		},
@@ -118,18 +130,6 @@ func Run(token string, db *sql.DB) {
 		{
 			Name:        "skip",
 			Description: "Skips currently playing song",
-		},
-		{
-			Name:        "playlista",
-			Description: "Play from playlist",
-			Options: []*discordgo.ApplicationCommandOption{
-				{
-					Type:        discordgo.ApplicationCommandOptionString,
-					Name:        "id",
-					Description: "Playlist Id",
-					Required:    true,
-				},
-			},
 		},
 		{
 			Name:        "kolendy",
@@ -252,6 +252,15 @@ func LeaveServerForInteraction(discord *discordgo.Session, i *discordgo.Interact
 			Content: "I'm not in a voice channel",
 		})
 	}
+	discord.UpdateStatusComplex(discordgo.UpdateStatusData{
+		Status: "online",
+		Activities: []*discordgo.Activity{
+			{
+				Name: "",
+				Type: discordgo.ActivityTypeListening,
+			},
+		},
+	})
 }
 
 func PlayMusicFromInteraction(player *VoicePlayer, song Song, discord *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -795,30 +804,6 @@ func ShowPlayStatsForInteraction(discord *discordgo.Session, message *discordgo.
 	fmt.Println(result)
 
 	return result
-}
-
-func ShowPlayStats(discord *discordgo.Session, message *discordgo.MessageCreate, db *sql.DB) {
-	var songs []crud.Song_counter
-	var err error
-	songs, err = crud.ReadAllPlayedCountForSongInServer(message.GuildID, db)
-	if err != nil {
-		fmt.Println("Error while reading from database :", err)
-	}
-	fmt.Println(songs)
-
-	var sb strings.Builder
-	sb.WriteString("Songs statistics are:\n")
-
-	for _, song := range songs {
-		sb.WriteString(fmt.Sprintf("Song title %s was played %d\n", song.Title, song.Played_counter))
-		fmt.Println(song.Title, song.Played_counter)
-	}
-	sb.WriteString("Thats it folks")
-
-	result := sb.String()
-	fmt.Println(result)
-
-	discord.ChannelMessageSend(message.ChannelID, result)
 }
 
 func newCommand(discord *discordgo.Session, i *discordgo.InteractionCreate, db *sql.DB) {
