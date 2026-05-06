@@ -220,8 +220,8 @@ func AddSongToPlaylist(db *sql.DB, playlistId int, songId string) error {
 	return nil
 }
 
-func CreatePlaylist(db *sql.DB, playlistTitle string) error {
-	_, err := db.Exec(`
+func CreatePlaylist(db *sql.DB, playlistTitle string) (int, error) {
+	result, err := db.Exec(`
 		INSERT
 		INTO
 			playlist(
@@ -239,11 +239,13 @@ func CreatePlaylist(db *sql.DB, playlistTitle string) error {
 		)
 		`, playlistTitle)
 
-	if err != nil {
-		return err
+	id, er := result.LastInsertId()
+
+	if err != nil || er != nil {
+		return 0, err
 	}
 
-	return nil
+	return int(id), nil
 }
 
 func ChangePlaylistName(db *sql.DB, playlistID int, newName string) error {

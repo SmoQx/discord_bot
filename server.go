@@ -15,8 +15,8 @@ import (
 )
 
 var discordOAuth = &oauth2.Config{
-	ClientID:     os.Getenv("DISCORD_CLIENT_ID"),
-	ClientSecret: os.Getenv("DISCORD_CLIENT_SECRET"),
+	ClientID:     os.Getenv("ClientID"),
+	ClientSecret: os.Getenv("ClientSecret"),
 	RedirectURL:  "http://localhost:8080/auth/callback",
 	Scopes:       []string{"identify", "guilds"},
 	Endpoint: oauth2.Endpoint{
@@ -25,7 +25,7 @@ var discordOAuth = &oauth2.Config{
 	},
 }
 
-const YOUR_SERVER_ID = "123456789012345678" // your guild ID from DB tmp
+const YOUR_SERVER_ID = "" // your guild ID from DB tmp
 
 func GetSongs(ctx *gin.Context, db *sql.DB) {
 	songs, err := crud.GetSongs(db)
@@ -62,7 +62,7 @@ func ChangePlaylistName(ctx *gin.Context, db *sql.DB, playlistID int, newName st
 }
 
 func CreatePlaylist(ctx *gin.Context, db *sql.DB, title string) {
-	err := crud.CreatePlaylist(db, title)
+	id, err := crud.CreatePlaylist(db, title)
 
 	fmt.Println(err)
 
@@ -70,7 +70,7 @@ func CreatePlaylist(ctx *gin.Context, db *sql.DB, title string) {
 		ctx.JSON(http.StatusNotFound, err)
 	}
 
-	ctx.JSON(http.StatusOK, nil)
+	ctx.JSON(http.StatusOK, gin.H{"playlist_id": id})
 }
 
 func RemovePlaylist(ctx *gin.Context, db *sql.DB, playlistId int) {
@@ -179,7 +179,7 @@ func handleCallback(c *gin.Context) {
 	session.Save()
 
 	// redirect to frontend
-	c.Redirect(http.StatusTemporaryRedirect, "http://localhost:3000")
+	c.Redirect(http.StatusTemporaryRedirect, "http://localhost:8080")
 }
 
 // middleware — protects all /api routes
@@ -187,6 +187,7 @@ func authMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		session := sessions.Default(c)
 		userID := session.Get("user_id")
+		fmt.Println(userID)
 		if userID == nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
 			c.Abort()
@@ -201,26 +202,28 @@ func authMiddleware() gin.HandlerFunc {
 func RunServer(db *sql.DB) {
 
 	router := gin.Default()
-	// router.Use(func(c *gin.Context) {
-	// 	c.Header("Access-Control-Allow-Origin", "*")
-	// 	c.Header("Access-Control-Allow-Methods", "GET, PUT, POST, DELETE, OPTIONS, PATCH")
-	// 	c.Header("Access-Control-Allow-Headers", "Content-Type")
-	// 	if c.Request.Method == "OPTIONS" {
-	// 		c.AbortWithStatus(http.StatusNoContent)
-	// 		return
-	// 	}
-	// 	c.Next()
-	// })
+	router.Use(func(c *gin.Context) {
+		c.Header("Access-Control-Allow-Origin", "*")
+		c.Header("Access-Control-Allow-Methods", "GET, PUT, POST, DELETE, OPTIONS, PATCH")
+		c.Header("Access-Control-Allow-Headers", "Content-Type")
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(http.StatusNoContent)
+			return
+		}
+		c.Next()
+	})
 
 	// router.Static("/static", "./static")
 
 	// cookie session store
-	store := cookie.NewStore([]byte(os.Getenv("SESSION_SECRET")))
+	store := cookie.NewStore([]byte("random_state_string"))
 	store.Options(sessions.Options{
+		Path:     "/",
 		HttpOnly: true,
 		Secure:   false,        // set true in production with HTTPS
 		MaxAge:   60 * 60 * 24, // 1 day
 	})
+
 	router.Use(sessions.Sessions("discord_session", store))
 
 	// auth routes — no middleware
