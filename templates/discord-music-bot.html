@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SOUNDWAVE — Discord Music Bot</title>
+    <title>ANDRZEJ — Discord Music Bot</title>
     <link
         href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Space+Mono:wght@400;700&display=swap"
         rel="stylesheet">
@@ -2038,7 +2038,7 @@
 
             dragSrcIdx = null;
             renderQueue();
-            pushMsg('SOUNDWAVE', `Queue reordered — "${getSong(moved).title}" moved to position ${insertAt + 1}`, 'bot');
+            pushMsg('ANDRZEJ', `Queue reordered — "${getSong(moved).title}" moved to position ${insertAt + 1}`, 'bot');
         }
 
         function onDragEnd(e) {
@@ -2458,11 +2458,11 @@
                 const arg = parts.slice(1).join(' ');
                 const handler = botResponses[cmd];
                 if (handler) {
-                    pushMsg('SOUNDWAVE', handler(arg), 'bot');
+                    pushMsg('ANDRZEJ', handler(arg), 'bot');
                 } else if (raw.startsWith('!')) {
-                    pushMsg('SOUNDWAVE', `Unknown command "${cmd}". Type !help for commands.`, 'bot');
+                    pushMsg('ANDRZEJ', `Unknown command "${cmd}". Type !help for commands.`, 'bot');
                 } else {
-                    pushMsg('SOUNDWAVE', `I only respond to commands starting with ! — try !help`, 'bot');
+                    pushMsg('ANDRZEJ', `I only respond to commands starting with ! — try !help`, 'bot');
                 }
             }, 400 + Math.random() * 300);
         }
@@ -2475,10 +2475,10 @@
         // Seed feed with initial messages
         function seedFeed() {
             const s = getSong(currentSongId);
-            pushMsg('SOUNDWAVE', 'Bot connected to voice channel #music', 'bot');
-            pushMsg('SOUNDWAVE', `Loaded ${songs.length} cached tracks from database`, 'bot');
-            if (s) pushMsg('SOUNDWAVE', `Now playing: ${s.title}`, 'bot');
-            else pushMsg('SOUNDWAVE', 'No track selected — pick a song to start', 'bot');
+            pushMsg('ANDRZEJ', 'Bot connected to voice channel #music', 'bot');
+            pushMsg('ANDRZEJ', `Loaded ${songs.length} cached tracks from database`, 'bot');
+            if (s) pushMsg('ANDRZEJ', `Now playing: ${s.title}`, 'bot');
+            else pushMsg('ANDRZEJ', 'No track selected — pick a song to start', 'bot');
         }
 
         // ─── YOUTUBE SEARCH ───
@@ -2534,7 +2534,7 @@
       </div>
     `).join('');
 
-                pushMsg('SOUNDWAVE', `Found ${generated.length} results for "${q}"`, 'bot');
+                pushMsg('ANDRZEJ', `Found ${generated.length} results for "${q}"`, 'bot');
             }, 900 + Math.random() * 500);
         }
 
@@ -2546,7 +2546,7 @@
             playSong(newId);
             document.getElementById('ytResults').innerHTML = '';
             document.getElementById('ytInput').value = '';
-            pushMsg('SOUNDWAVE', `Now playing: "${title}" [YouTube] ▶`, 'bot');
+            pushMsg('ANDRZEJ', `Now playing: "${title}" [YouTube] ▶`, 'bot');
             toast(`Playing "${title}"`, 'success');
         }
 
@@ -2555,7 +2555,7 @@
             songs.push({id: newId, title, server: 'youtube', played_counter: 0});
             queue.push(newId);
             renderQueue();
-            pushMsg('SOUNDWAVE', `Added to queue: "${title}" [YouTube]`, 'bot');
+            pushMsg('ANDRZEJ', `Added to queue: "${title}" [YouTube]`, 'bot');
             toast(`Queued "${title}"`, 'success');
         }
 
