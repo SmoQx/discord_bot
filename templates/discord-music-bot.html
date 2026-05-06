@@ -1621,161 +1621,172 @@
 </head>
 
 <body>
-
-    <header>
+    <div id="loginScreen"
+        style="display:none; position:fixed; inset:0; background:var(--bg); z-index:999; align-items:center; justify-content:center; flex-direction:column; gap:20px;">
         <div class="logo">SOUND<span>WAVE</span></div>
-        <nav class="nav-tabs">
-            <button class="nav-tab active" onclick="setPage('player')">Player</button>
-            <button class="nav-tab" onclick="setPage('library')">Library</button>
-            <button class="nav-tab" onclick="setPage('playlists')">Playlists</button>
-            <button class="nav-tab" onclick="setPage('stats')">Stats</button>
-        </nav>
-        <div class="status-badge">
-            <div class="status-dot"></div>
-            BOT ONLINE
-        </div>
-    </header>
+        <p style="color:var(--text2); font-size:12px; letter-spacing:2px;">MEMBERS ONLY</p>
+        <button onclick="login()"
+            style="padding:12px 28px; background:var(--cyan); border:none; border-radius:8px; font-family:'Space Mono',monospace; font-weight:700; cursor:pointer; color:var(--bg); letter-spacing:2px; box-shadow:var(--glow-cyan);">
+            LOGIN WITH DISCORD
+        </button>
+    </div>
 
-    <main>
-        <!-- LEFT: Song Library -->
-        <div class="panel" id="leftPanel">
-            <!-- YouTube Search -->
-            <div class="yt-search-area">
-                <div class="yt-label"><span class="yt-icon"></span>YouTube Search</div>
-                <div class="yt-input-row">
-                    <input type="text" class="yt-input" id="ytInput" placeholder="Search YouTube for a song..."
-                        onkeydown="if(event.key==='Enter') ytSearch()">
-                    <button class="yt-search-btn" id="ytSearchBtn" onclick="ytSearch()">SEARCH</button>
-                </div>
-                <div class="yt-results" id="ytResults"></div>
+    <div id="app">
+        <header>
+            <div class="logo">SOUND<span>WAVE</span></div>
+            <nav class="nav-tabs">
+                <button class="nav-tab active" onclick="setPage('player')">Player</button>
+                <button class="nav-tab" onclick="setPage('library')">Library</button>
+                <button class="nav-tab" onclick="setPage('playlists')">Playlists</button>
+                <button class="nav-tab" onclick="setPage('stats')">Stats</button>
+            </nav>
+            <div class="status-badge">
+                <div class="status-dot"></div>
+                BOT ONLINE
             </div>
+        </header>
 
-            <div class="panel-header">
-                <div class="panel-title">Song Cache</div>
-                <div class="search-wrap">
-                    <svg class="search-icon" viewBox="0 0 16 16">
-                        <circle cx="6" cy="6" r="4" />
-                        <path d="m10 10 4 4" stroke-linecap="round" />
-                    </svg>
-                    <input type="text" placeholder="Search songs..." id="songSearch" oninput="filterSongs()">
+        <main>
+            <!-- LEFT: Song Library -->
+            <div class="panel" id="leftPanel">
+                <!-- YouTube Search -->
+                <div class="yt-search-area">
+                    <div class="yt-label"><span class="yt-icon"></span>YouTube Search</div>
+                    <div class="yt-input-row">
+                        <input type="text" class="yt-input" id="ytInput" placeholder="Search YouTube for a song..."
+                            onkeydown="if(event.key==='Enter') ytSearch()">
+                        <button class="yt-search-btn" id="ytSearchBtn" onclick="ytSearch()">SEARCH</button>
+                    </div>
+                    <div class="yt-results" id="ytResults"></div>
                 </div>
-            </div>
 
-            <div class="song-list" id="songListEl"></div>
-        </div>
-
-        <!-- CENTER: Now Playing + Queue -->
-        <div class="center-panel panel">
-            <!-- Now Playing -->
-            <div class="now-playing">
-                <div class="np-label">Now Playing</div>
-                <div class="np-main">
-                    <div class="np-artwork" id="npArtwork">🎵</div>
-                    <div class="np-details">
-                        <div class="np-title" id="npTitle">Select a track</div>
-                        <div class="np-sub" id="npSub">—</div>
+                <div class="panel-header">
+                    <div class="panel-title">Song Cache</div>
+                    <div class="search-wrap">
+                        <svg class="search-icon" viewBox="0 0 16 16">
+                            <circle cx="6" cy="6" r="4" />
+                            <path d="m10 10 4 4" stroke-linecap="round" />
+                        </svg>
+                        <input type="text" placeholder="Search songs..." id="songSearch" oninput="filterSongs()">
                     </div>
                 </div>
 
-                <div class="progress-area">
-                    <div class="progress-track" onclick="seekTrack(event)">
-                        <div class="progress-fill" id="progressFill"></div>
+                <div class="song-list" id="songListEl"></div>
+            </div>
+
+            <!-- CENTER: Now Playing + Queue -->
+            <div class="center-panel panel">
+                <!-- Now Playing -->
+                <div class="now-playing">
+                    <div class="np-label">Now Playing</div>
+                    <div class="np-main">
+                        <div class="np-artwork" id="npArtwork">🎵</div>
+                        <div class="np-details">
+                            <div class="np-title" id="npTitle">Select a track</div>
+                            <div class="np-sub" id="npSub">—</div>
+                        </div>
                     </div>
-                    <div class="progress-times">
-                        <span id="timeElapsed">0:00</span>
-                        <span id="timeTotal">—</span>
+
+                    <div class="progress-area">
+                        <div class="progress-track" onclick="seekTrack(event)">
+                            <div class="progress-fill" id="progressFill"></div>
+                        </div>
+                        <div class="progress-times">
+                            <span id="timeElapsed">0:00</span>
+                            <span id="timeTotal">—</span>
+                        </div>
+                    </div>
+
+                    <div class="controls">
+                        <button class="ctrl-btn" id="shuffleBtn" title="Shuffle" onclick="toggleShuffle()">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M16 3h5v5M4 20l5.5-5.5M21 3l-7.5 7.5M4 4l5.5 5.5M16 21h5v-5M15 15l6 6"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none" />
+                            </svg>
+                        </button>
+                        <button class="ctrl-btn" onclick="prevSong()" title="Previous">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M19 20 9 12l10-8v16zM5 4v16" stroke="currentColor" stroke-width="2"
+                                    stroke-linecap="round" fill="none" />
+                            </svg>
+                        </button>
+                        <button class="play-btn" id="playBtn" onclick="togglePlay()">
+                            <svg id="playIcon" viewBox="0 0 24 24">
+                                <path d="M5 3l14 9-14 9V3z" />
+                            </svg>
+                        </button>
+                        <button class="ctrl-btn" onclick="nextSong()" title="Next">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M5 4l10 8-10 8V4zM19 4v16" stroke="currentColor" stroke-width="2"
+                                    stroke-linecap="round" fill="none" />
+                            </svg>
+                        </button>
+                        <button class="ctrl-btn" id="loopBtn" title="Loop" onclick="toggleLoop()">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M17 1l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <div class="vol-area">
+                        <span class="vol-label">VOL</span>
+                        <input type="range" class="vol-slider" min="0" max="100" value="70" id="volSlider"
+                            oninput="updateVol(this.value)">
+                        <span class="vol-label" id="volVal">70%</span>
                     </div>
                 </div>
 
-                <div class="controls">
-                    <button class="ctrl-btn" id="shuffleBtn" title="Shuffle" onclick="toggleShuffle()">
-                        <svg viewBox="0 0 24 24">
-                            <path d="M16 3h5v5M4 20l5.5-5.5M21 3l-7.5 7.5M4 4l5.5 5.5M16 21h5v-5M15 15l6 6"
-                                stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none" />
-                        </svg>
-                    </button>
-                    <button class="ctrl-btn" onclick="prevSong()" title="Previous">
-                        <svg viewBox="0 0 24 24">
-                            <path d="M19 20 9 12l10-8v16zM5 4v16" stroke="currentColor" stroke-width="2"
-                                stroke-linecap="round" fill="none" />
-                        </svg>
-                    </button>
-                    <button class="play-btn" id="playBtn" onclick="togglePlay()">
-                        <svg id="playIcon" viewBox="0 0 24 24">
-                            <path d="M5 3l14 9-14 9V3z" />
-                        </svg>
-                    </button>
-                    <button class="ctrl-btn" onclick="nextSong()" title="Next">
-                        <svg viewBox="0 0 24 24">
-                            <path d="M5 4l10 8-10 8V4zM19 4v16" stroke="currentColor" stroke-width="2"
-                                stroke-linecap="round" fill="none" />
-                        </svg>
-                    </button>
-                    <button class="ctrl-btn" id="loopBtn" title="Loop" onclick="toggleLoop()">
-                        <svg viewBox="0 0 24 24">
-                            <path d="M17 1l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3"
-                                stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none" />
-                        </svg>
-                    </button>
-                </div>
-
-                <div class="vol-area">
-                    <span class="vol-label">VOL</span>
-                    <input type="range" class="vol-slider" min="0" max="100" value="70" id="volSlider"
-                        oninput="updateVol(this.value)">
-                    <span class="vol-label" id="volVal">70%</span>
+                <!-- Queue -->
+                <div class="queue-section">
+                    <div class="queue-header">
+                        <span class="queue-title">Queue <span class="tab-badge" id="queueBadge">0</span></span>
+                        <button class="icon-btn" onclick="clearQueue()" title="Clear queue">
+                            <svg viewBox="0 0 24 24">
+                                <polyline points="3 6 5 6 21 6" />
+                                <path d="M19 6l-1 14H6L5 6M10 11v6M14 11v6M9 6V4h6v2" stroke-linecap="round"
+                                    stroke-linejoin="round" />
+                            </svg>
+                        </button>
+                    </div>
+                    <div id="queueList"></div>
                 </div>
             </div>
 
-            <!-- Queue -->
-            <div class="queue-section">
-                <div class="queue-header">
-                    <span class="queue-title">Queue <span class="tab-badge" id="queueBadge">0</span></span>
-                    <button class="icon-btn" onclick="clearQueue()" title="Clear queue">
-                        <svg viewBox="0 0 24 24">
-                            <polyline points="3 6 5 6 21 6" />
-                            <path d="M19 6l-1 14H6L5 6M10 11v6M14 11v6M9 6V4h6v2" stroke-linecap="round"
-                                stroke-linejoin="round" />
-                        </svg>
+            <!-- RIGHT: Stats + Playlists -->
+            <div class="panel right-panel">
+                <!-- Top 10 Stats -->
+                <div class="panel-header">
+                    <div class="panel-title">Top 10 Tracks</div>
+                </div>
+                <div class="stats-section" id="topSongsList"></div>
+
+                <!-- Playlists -->
+                <div class="playlists-wrapper">
+                    <div class="section-divider">Playlists</div>
+                    <div class="playlists-section" id="playlistsList"></div>
+                    <button class="create-playlist-btn" onclick="openCreatePlaylist()">
+                        <span class="plus-circle">+</span>
+                        New Playlist
                     </button>
                 </div>
-                <div id="queueList"></div>
-            </div>
-        </div>
 
-        <!-- RIGHT: Stats + Playlists -->
-        <div class="panel right-panel">
-            <!-- Top 10 Stats -->
-            <div class="panel-header">
-                <div class="panel-title">Top 10 Tracks</div>
-            </div>
-            <div class="stats-section" id="topSongsList"></div>
-
-            <!-- Playlists -->
-            <div class="playlists-wrapper">
-                <div class="section-divider">Playlists</div>
-                <div class="playlists-section" id="playlistsList"></div>
-                <button class="create-playlist-btn" onclick="openCreatePlaylist()">
-                    <span class="plus-circle">+</span>
-                    New Playlist
-                </button>
-            </div>
-
-            <!-- Bot Message Feed -->
-            <div class="bot-feed">
-                <div class="bot-feed-header">
-                    <span class="bot-feed-title"><span class="live-dot"></span>Bot Messages</span>
-                    <button class="feed-clear-btn" onclick="clearFeed()">CLEAR</button>
-                </div>
-                <div class="bot-messages" id="botMessages"></div>
-                <div class="msg-input-row">
-                    <input type="text" class="msg-input" id="msgInput" placeholder="Send a command to bot..."
-                        onkeydown="if(event.key==='Enter') sendMsg()">
-                    <button class="msg-send-btn" onclick="sendMsg()">SEND</button>
+                <!-- Bot Message Feed -->
+                <div class="bot-feed">
+                    <div class="bot-feed-header">
+                        <span class="bot-feed-title"><span class="live-dot"></span>Bot Messages</span>
+                        <button class="feed-clear-btn" onclick="clearFeed()">CLEAR</button>
+                    </div>
+                    <div class="bot-messages" id="botMessages"></div>
+                    <div class="msg-input-row">
+                        <input type="text" class="msg-input" id="msgInput" placeholder="Send a command to bot..."
+                            onkeydown="if(event.key==='Enter') sendMsg()">
+                        <button class="msg-send-btn" onclick="sendMsg()">SEND</button>
+                    </div>
                 </div>
             </div>
-        </div>
-    </main>
+        </main>
+    </div>
 
     <!-- CREATE PLAYLIST MODAL -->
     <div class="modal-overlay" id="createPlaylistModal">
@@ -1824,7 +1835,37 @@
         // ─── MOCK DATA (replace with real API calls to your SQLite backend) ───
         const emojis = ['🎸', '🎹', '🎺', '🎷', '🎻', '🥁', '🎤', '🎧', '🎵', '🎶', '🎼', '🔥', '💫', '⚡', '🌊'];
 
-        const API = 'http://localhost:8080';  // your Go server
+        const API = '';  // your Go server
+
+        // check if already authenticated on page load
+        async function checkAuth() {
+            try {
+                const res = await fetch(`${API}/api/songs`, {credentials: 'include'});
+                if (res.status === 401) {
+                    showLoginScreen();
+                    return;
+                }
+                // authenticated — load the app normally
+                loadSongs();
+                loadPlaylists();
+                renderQueue();
+                updateNowPlaying();
+                updatePlayBtn();
+                startProgress();
+                seedFeed();
+            } catch (err) {
+                showLoginScreen();
+            }
+        }
+
+        function showLoginScreen() {
+            document.getElementById('app').style.display = 'none';
+            document.getElementById('loginScreen').style.display = 'flex';
+        }
+
+        function login() {
+            window.location.href = `${API}/auth/login`;
+        }
 
         let songs = [];
 
@@ -2500,13 +2541,7 @@
 
         // ─── INIT ───
         // renderSongs();
-        loadSongs();
-        loadPlaylists();
-        renderQueue();
-        updateNowPlaying();
-        updatePlayBtn();
-        startProgress();
-        seedFeed();
+        checkAuth();
     </script>
 </body>
 
