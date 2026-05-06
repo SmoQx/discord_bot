@@ -94,18 +94,18 @@ func AddSongToPlaylist(ctx *gin.Context, db *sql.DB, playlistID int, songId stri
 func RunServer(db *sql.DB) {
 
 	router := gin.Default()
-	router.Use(func(c *gin.Context) {
-		c.Header("Access-Control-Allow-Origin", "*")
-		c.Header("Access-Control-Allow-Methods", "GET, PUT, POST, DELETE, OPTIONS, PATCH")
-		c.Header("Access-Control-Allow-Headers", "Content-Type")
-		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(http.StatusNoContent)
-			return
-		}
-		c.Next()
-	})
+	// router.Use(func(c *gin.Context) {
+	// 	c.Header("Access-Control-Allow-Origin", "*")
+	// 	c.Header("Access-Control-Allow-Methods", "GET, PUT, POST, DELETE, OPTIONS, PATCH")
+	// 	c.Header("Access-Control-Allow-Headers", "Content-Type")
+	// 	if c.Request.Method == "OPTIONS" {
+	// 		c.AbortWithStatus(http.StatusNoContent)
+	// 		return
+	// 	}
+	// 	c.Next()
+	// })
 
-	router.Static("/static", "./static")
+	// router.Static("/static", "./static")
 	router.LoadHTMLGlob("templates/*")
 
 	router.GET("/", func(ctx *gin.Context) {
@@ -125,6 +125,7 @@ func RunServer(db *sql.DB) {
 	})
 
 	router.GET("/api/queue", func(ctx *gin.Context) {
+		fmt.Println(players[""].Queue)
 		ctx.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
 
@@ -196,5 +197,5 @@ func RunServer(db *sql.DB) {
 		RemovePlaylist(ctx, db, body.PlaylistId)
 	})
 
-	router.Run("127.0.0.1:8080")
+	router.Run("localhost:8080")
 }
