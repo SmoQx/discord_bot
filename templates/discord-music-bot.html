@@ -1623,7 +1623,7 @@
 <body>
     <div id="loginScreen"
         style="display:none; position:fixed; inset:0; background:var(--bg); z-index:999; align-items:center; justify-content:center; flex-direction:column; gap:20px;">
-        <div class="logo">SOUND<span>WAVE</span></div>
+        <div class="logo">ANDRZ<span>EJ</span></div>
         <p style="color:var(--text2); font-size:12px; letter-spacing:2px;">MEMBERS ONLY</p>
         <button onclick="login()"
             style="padding:12px 28px; background:var(--cyan); border:none; border-radius:8px; font-family:'Space Mono',monospace; font-weight:700; cursor:pointer; color:var(--bg); letter-spacing:2px; box-shadow:var(--glow-cyan);">
@@ -1633,13 +1633,18 @@
 
     <div id="app">
         <header>
-            <div class="logo">SOUND<span>WAVE</span></div>
+            <div class="logo">ANDRZ<span>EJ</span></div>
             <nav class="nav-tabs">
                 <button class="nav-tab active" onclick="setPage('player')">Player</button>
                 <button class="nav-tab" onclick="setPage('library')">Library</button>
                 <button class="nav-tab" onclick="setPage('playlists')">Playlists</button>
                 <button class="nav-tab" onclick="setPage('stats')">Stats</button>
             </nav>
+
+            <button onclick="logout()"
+                style="font-family:'Space Mono',monospace; font-size:11px; background:none; border:1px solid var(--border); border-radius:6px; padding:6px 14px; color:var(--text2); cursor:pointer; letter-spacing:1px;">
+                LOGOUT
+            </button>
             <div class="status-badge">
                 <div class="status-dot"></div>
                 BOT ONLINE
@@ -1865,6 +1870,11 @@
 
         function login() {
             window.location.href = `${API}/auth/login`;
+        }
+
+        async function logout() {
+            await fetch('/auth/logout');
+            window.location.reload();
         }
 
         let songs = [];
