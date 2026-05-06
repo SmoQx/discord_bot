@@ -211,26 +211,6 @@ func PrintHelp(discord *discordgo.Session, message *discordgo.MessageCreate) {
 	discord.ChannelMessageSend(message.ChannelID, message_text)
 }
 
-func JoinServer(discord *discordgo.Session, message *discordgo.MessageCreate) {
-	// Find the voice state for the user in the guild
-	vs, err := findUserVoiceState(discord, message.GuildID, message.Author.ID)
-	if err != nil {
-		discord.ChannelMessageSend(message.ChannelID, "You must be in a voice channel first!")
-		return
-	}
-
-	// Connect to that voice channel
-	vc, err := discord.ChannelVoiceJoin(context.TODO(), message.GuildID, vs.ChannelID, false, true)
-	if err != nil {
-		discord.ChannelMessageSend(message.ChannelID, "Failed to join voice channel.")
-		fmt.Println("Error joining voice channel:", err)
-		return
-	}
-
-	voiceConnections[message.GuildID] = vc
-	discord.ChannelMessageSend(message.ChannelID, "Joined your voice channel!")
-}
-
 func JoinServerFromCommand(discord *discordgo.Session, i *discordgo.InteractionCreate) {
 	// Find the voice state for the user in the guild
 	vs, err := findUserVoiceState(discord, i.GuildID, i.Member.User.ID)
@@ -271,17 +251,6 @@ func LeaveServerForInteraction(discord *discordgo.Session, i *discordgo.Interact
 		discord.FollowupMessageCreate(i.Interaction, false, &discordgo.WebhookParams{
 			Content: "I'm not in a voice channel",
 		})
-	}
-}
-
-func LeaveServer(discord *discordgo.Session, message *discordgo.MessageCreate) {
-	if vc, ok := discord.VoiceConnections[message.GuildID]; ok {
-		vc.Disconnect(context.TODO())
-		delete(voiceConnections, vc.GuildID)
-		delete(players, vc.GuildID)
-		discord.ChannelMessageSend(message.ChannelID, "Leaveing the voice channel")
-	} else {
-		discord.ChannelMessageSend(message.ChannelID, "I'm not in a voice channel")
 	}
 }
 
@@ -456,26 +425,6 @@ func StopMusicForInteraction(vc *discordgo.VoiceConnection, discord *discordgo.S
 	discord.FollowupMessageCreate(interaction.Interaction, false, &discordgo.WebhookParams{
 		Content: "Stopped playback and cleared the queue.",
 	})
-}
-
-func StopMusic(vc *discordgo.VoiceConnection, discord *discordgo.Session, message *discordgo.MessageCreate) {
-	player, ok := players[vc.GuildID]
-	if !ok || !player.Playing {
-		discord.ChannelMessageSend(message.ChannelID, "No music is currently playing.")
-		return
-	}
-
-	player.AutoAdvance = false
-	player.Playing = false
-
-	if player.FFmpegCmd != nil {
-		_ = player.FFmpegCmd.Process.Kill()
-		player.FFmpegCmd = nil
-	}
-
-	player.Queue = []Song{}
-	vc.Speaking(false)
-	discord.ChannelMessageSend(message.ChannelID, "Stopped playback and cleared the queue.")
 }
 
 func IsPlaying(guildID string) bool {
