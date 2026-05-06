@@ -2054,8 +2054,22 @@
 
         function addToQueue(id) {
             queue.push(id);
-            renderQueue();
-            toast(`Added "${getSong(id).title}" to queue`, 'success');
+            try {
+                const res = await fetch(`${API}/api/queue/add`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        SongId: getSong(id).id,
+                        SongName: getSong(id).title
+                    })
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                renderQueue();
+                toast(`Added "${getSong(id).title}" to queue`, 'success');
+            }
+            catch (err) {
+                toast(`Added "${getSong(id).title}" to queue`, 'fail');
+            }
         }
 
         function removeFromQueue(idx) {

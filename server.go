@@ -256,6 +256,20 @@ func RunServer(db *sql.DB) {
 			ctx.JSON(http.StatusOK, gin.H{"queue": queue})
 		})
 
+		api.POST("/queue/add", func(ctx *gin.Context) {
+			var body struct {
+				SongId   string `json:"SongId"`
+				SongName string `json:"SongName"`
+			}
+
+			if err := ctx.ShouldBindJSON(&body); err != nil {
+				ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+
+			players[YOUR_SERVER_ID].Queue = append(players[YOUR_SERVER_ID].Queue, Song{body.SongId, body.SongName})
+		})
+
 		api.GET("/currentlyPlaying", func(ctx *gin.Context) {
 			currentSong := players[YOUR_SERVER_ID].CurrentSong
 			fmt.Println(currentSong)
