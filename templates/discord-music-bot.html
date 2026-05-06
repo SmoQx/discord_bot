@@ -2052,7 +2052,7 @@
             });
         }
 
-        function addToQueue(id) {
+        async function addToQueue(id) {
             queue.push(id);
             try {
                 const res = await fetch(`${API}/api/queue/add`, {

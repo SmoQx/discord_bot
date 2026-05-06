@@ -5,6 +5,7 @@ import (
 	"discord_bot/crud"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 
@@ -14,18 +15,42 @@ import (
 	"golang.org/x/oauth2"
 )
 
-var discordOAuth = &oauth2.Config{
-	ClientID:     os.Getenv("ClientID"),
-	ClientSecret: os.Getenv("ClientSecret"),
-	RedirectURL:  "http://localhost:8080/auth/callback",
-	Scopes:       []string{"identify", "guilds"},
-	Endpoint: oauth2.Endpoint{
-		AuthURL:  "https://discord.com/api/oauth2/authorize",
-		TokenURL: "https://discord.com/api/oauth2/token",
-	},
+type Secret struct {
+	ServerID            string
+	ClientID            string
+	random_state_string string
+	ClientSecret        string
 }
 
-const YOUR_SERVER_ID = "" // your guild ID from DB tmp
+var secret Secret
+
+func getOAuthConfig(r *http.Request) *oauth2.Config {
+
+	bytes, err := os.ReadFile("secret.json") // replaces ioutil.ReadFile
+
+	if err != nil {
+		log.Fatal("Error reading file:", err)
+	}
+
+	if err := json.Unmarshal(bytes, &secret); err != nil {
+		log.Fatal("Error decoding JSON:", err)
+	}
+
+	scheme := "http"
+	host := r.Host
+	return &oauth2.Config{
+		ClientID:     secret.ClientID,
+		ClientSecret: secret.ClientSecret,
+		RedirectURL:  fmt.Sprintf("%s://%s/auth/callback", scheme, host),
+		Scopes:       []string{"identify", "guilds"},
+		Endpoint: oauth2.Endpoint{
+			AuthURL:  "https://discord.com/api/oauth2/authorize",
+			TokenURL: "https://discord.com/api/oauth2/token",
+		},
+	}
+}
+
+var YOUR_SERVER_ID = secret.ServerID // your guild ID from DB tmp
 
 func GetSongs(ctx *gin.Context, db *sql.DB) {
 	songs, err := crud.GetSongs(db)
@@ -110,7 +135,7 @@ func AddSongToPlaylist(ctx *gin.Context, db *sql.DB, playlistID int, songId stri
 }
 
 func handleLogin(c *gin.Context) {
-	url := discordOAuth.AuthCodeURL("random_state_string")
+	url := getOAuthConfig(c.Request).AuthCodeURL("random_state_string")
 	c.Redirect(http.StatusTemporaryRedirect, url)
 }
 
@@ -124,14 +149,17 @@ func handleLogout(c *gin.Context) {
 // Discord redirects back here with a code
 func handleCallback(c *gin.Context) {
 	code := c.Query("code")
-	token, err := discordOAuth.Exchange(c, code)
+	token, err := getOAuthConfig(c.Request).Exchange(c, code)
+	fmt.Println(token)
+	fmt.Println(code)
+	fmt.Println(err)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "token exchange failed"})
 		return
 	}
 
 	// fetch user info from Discord
-	client := discordOAuth.Client(c, token)
+	client := getOAuthConfig(c.Request).Client(c, token)
 	resp, err := client.Get("https://discord.com/api/users/@me")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get user"})
@@ -179,7 +207,7 @@ func handleCallback(c *gin.Context) {
 	session.Save()
 
 	// redirect to frontend
-	c.Redirect(http.StatusTemporaryRedirect, "http://localhost:8080")
+	c.Redirect(http.StatusTemporaryRedirect, ":8080")
 }
 
 // middleware — protects all /api routes
@@ -347,5 +375,5 @@ func RunServer(db *sql.DB) {
 		ctx.HTML(http.StatusOK, "discord-music-bot.html", nil)
 	})
 
-	router.Run("localhost:8080")
+	router.Run(":8080")
 }
