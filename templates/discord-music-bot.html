@@ -1621,6 +1621,7 @@
 </head>
 
 <body>
+
     <div id="loginScreen"
         style="display:none; position:fixed; inset:0; background:var(--bg); z-index:999; align-items:center; justify-content:center; flex-direction:column; gap:20px;">
         <div class="logo">ANDRZ<span>EJ</span></div>
@@ -1631,7 +1632,8 @@
         </button>
     </div>
 
-    <div id="app">
+    <div id="app" style="display:none;">
+
         <header>
             <div class="logo">ANDRZ<span>EJ</span></div>
             <nav class="nav-tabs">
@@ -1640,14 +1642,13 @@
                 <button class="nav-tab" onclick="setPage('playlists')">Playlists</button>
                 <button class="nav-tab" onclick="setPage('stats')">Stats</button>
             </nav>
-
-            <button onclick="logout()"
-                style="font-family:'Space Mono',monospace; font-size:11px; background:none; border:1px solid var(--border); border-radius:6px; padding:6px 14px; color:var(--text2); cursor:pointer; letter-spacing:1px;">
-                LOGOUT
-            </button>
-            <div class="status-badge">
-                <div class="status-dot"></div>
-                BOT ONLINE
+            <div style="display:flex; align-items:center; gap:12px;">
+                <button onclick="logout()"
+                    style="font-family:'Space Mono',monospace; font-size:11px; background:none; border:1px solid var(--border); border-radius:6px; padding:6px 14px; color:var(--text2); cursor:pointer; letter-spacing:1px;">LOGOUT</button>
+                <div class="status-badge">
+                    <div class="status-dot"></div>
+                    BOT ONLINE
+                </div>
             </div>
         </header>
 
@@ -1791,7 +1792,7 @@
                 </div>
             </div>
         </main>
-    </div>
+    </div><!-- /#app -->
 
     <!-- CREATE PLAYLIST MODAL -->
     <div class="modal-overlay" id="createPlaylistModal">
@@ -1840,17 +1841,24 @@
         // ─── MOCK DATA (replace with real API calls to your SQLite backend) ───
         const emojis = ['🎸', '🎹', '🎺', '🎷', '🎻', '🥁', '🎤', '🎧', '🎵', '🎶', '🎼', '🔥', '💫', '⚡', '🌊'];
 
-        const API = '';  // your Go server
+        const API = '';
 
         // check if already authenticated on page load
         async function checkAuth() {
             try {
                 const res = await fetch(`${API}/api/songs`, {credentials: 'include'});
-                if (res.status === 401) {
+                if (res.status === 401) {showLoginScreen(); return;}
+                if (res.status === 403) {
+                    document.getElementById('loginScreen').innerHTML = `
+        <div class="logo">ANDRZ<span>EJ</span></div>
+        <p style="color:var(--pink); font-size:12px; letter-spacing:2px;">ACCESS DENIED</p>
+        <p style="color:var(--text2); font-size:11px;">You are not a member of this server.</p>`;
                     showLoginScreen();
                     return;
                 }
                 // authenticated — load the app normally
+                songs = await res.json();
+                document.getElementById('app').style.display = 'block';
                 loadSongs();
                 loadPlaylists();
                 renderQueue();
@@ -1868,23 +1876,30 @@
             document.getElementById('loginScreen').style.display = 'flex';
         }
 
-        function login() {
-            window.location.href = `${API}/auth/login`;
-        }
+        function login() {window.location.href = '/auth/login';}
 
         async function logout() {
             await fetch('/auth/logout');
             window.location.reload();
         }
 
-        let songs = [];
+        // ─── API WRAPPER — always sends credentials ───
+        async function apiFetch(url, options = {}) {
+            return fetch(url, {
+                ...options,
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...options.headers,
+                }
+            });
+        }
 
         async function loadSongs() {
             try {
                 const res = await fetch(`${API}/api/songs`);
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 songs = await res.json();
-                console.log(songs)
                 renderSongs();
                 renderTopSongs();
             } catch (err) {
@@ -1892,27 +1907,12 @@
             }
         }
 
-        // let playlists = [
-        //     {id: 1, title: "Late Night Vibes", songs: ["s1", "s3", "s6"]},
-        //     {id: 2, title: "Gaming Bangers", songs: ["s4", "s8", "s12"]},
-        //     {id: 3, title: "Chill Sessions", songs: ["s2", "s5", "s9", "s10"]},
-        // ];
+        // DATA
+        let songs = [];
         let playlists = [];
-
-        async function loadPlaylists() {
-            try {
-                const res = await fetch(`${API}/api/playlists`);
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                playlists = await res.json();
-                renderPlaylists();
-            } catch (err) {
-                pushMsg('SYSTEM', `Failed to load songs: ${err.message}`, 'system');
-            }
-        }
-
         let queue = [];
         let currentSongId = "";
-        let isPlaying = true;
+        let isPlaying = false;
         let isShuffle = false;
         let isLoop = false;
         let progress = 35;
@@ -2186,6 +2186,17 @@
         }
 
         // ─── PLAYLISTS ───
+        async function loadPlaylists() {
+            try {
+                const res = await fetch(`${API}/api/playlists`);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                playlists = await res.json();
+                renderPlaylists();
+            } catch (err) {
+                pushMsg('SYSTEM', `Failed to load songs: ${err.message}`, 'system');
+            }
+        }
+
         function renderPlaylists() {
             const el = document.getElementById('playlistsList');
             if (!playlists.length) {
@@ -2212,7 +2223,6 @@
         async function createPlaylist() {
             const name = document.getElementById('newPlaylistName').value.trim();
             if (!name) return;
-
             try {
                 const res = await fetch(`${API}/api/createPlaylist`, {
                     method: 'POST',
@@ -2222,10 +2232,11 @@
                     })
                 });
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
+                const data = await res.json();
+                playlists.push({id: data.playlist_id, title: name, songs: []});
+                loadPlaylists();
                 closeModal('createPlaylistModal');
                 toast(`Playlist "${name}" created`, 'success');
-                renderPlaylists();
             } catch (err) {
                 pushMsg('SYSTEM', `Failed to create playlist: ${err.message}`, 'system');
             }
@@ -2297,9 +2308,9 @@
                 // update local array only after successful save
                 const pl = playlists.find(p => p.id === editingPlaylistId);
                 pl.title = newName;
-                renderPlaylists();
                 closeModal('editPlaylistModal');
                 toast('Playlist saved', 'success');
+                loadPlaylists();
             } catch (err) {
                 pushMsg('SYSTEM', `Failed to save playlist: ${err.message}`, 'system');
             }
@@ -2317,7 +2328,7 @@
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
                 playlists = playlists.filter(p => p.id !== editingPlaylistId);
-                renderPlaylists();
+                loadPlaylists();
                 closeModal('editPlaylistModal');
                 toast('Playlist deleted', 'info');
             } catch (err) {
@@ -2376,7 +2387,7 @@
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
                 pl.songs.push(addToPlaylistSongId);
-                renderPlaylists();
+                loadPlaylists();
                 toast(`Added to "${pl.title}"`, 'success');
             } catch (err) {
                 pushMsg('SYSTEM', `Failed to add song: ${err.message}`, 'system');
@@ -2463,12 +2474,11 @@
 
         // Seed feed with initial messages
         function seedFeed() {
-            const msgs = [
-                ['SOUNDWAVE', 'Bot connected to voice channel #music', 'bot'],
-                ['SOUNDWAVE', `Loaded ${songs.length} cached tracks from database`, 'bot'],
-                ['SOUNDWAVE', `Now playing: ${getSong(currentSongId).title}`, 'bot'],
-            ];
-            msgs.forEach(([a, t, type]) => pushMsg(a, t, type));
+            const s = getSong(currentSongId);
+            pushMsg('SOUNDWAVE', 'Bot connected to voice channel #music', 'bot');
+            pushMsg('SOUNDWAVE', `Loaded ${songs.length} cached tracks from database`, 'bot');
+            if (s) pushMsg('SOUNDWAVE', `Now playing: ${s.title}`, 'bot');
+            else pushMsg('SOUNDWAVE', 'No track selected — pick a song to start', 'bot');
         }
 
         // ─── YOUTUBE SEARCH ───
@@ -2550,7 +2560,6 @@
         }
 
         // ─── INIT ───
-        // renderSongs();
         checkAuth();
     </script>
 </body>
