@@ -33,10 +33,11 @@ type Song struct {
 
 type VoicePlayer struct {
 	Playing     bool
-	VC          *discordgo.VoiceConnection
-	Queue       []Song
-	FFmpegCmd   *exec.Cmd
 	AutoAdvance bool
+	Queue       []Song
+	CurrentSong Song
+	VC          *discordgo.VoiceConnection
+	FFmpegCmd   *exec.Cmd
 }
 
 var players = make(map[string]*VoicePlayer)
@@ -341,6 +342,7 @@ func PlayMusicFromInteraction(player *VoicePlayer, song Song, discord *discordgo
 
 	if player.AutoAdvance && len(player.Queue) > 0 {
 		next := player.Queue[0]
+		player.CurrentSong = player.Queue[0]
 		player.Queue = player.Queue[1:]
 		go PlayMusicFromInteraction(player, next, discord, i)
 	} else if !player.AutoAdvance {

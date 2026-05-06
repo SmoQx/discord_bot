@@ -248,12 +248,18 @@ func RunServer(db *sql.DB) {
 		})
 
 		api.GET("/queue", func(ctx *gin.Context) {
-			fmt.Println(players[""].Queue)
-			ctx.JSON(http.StatusOK, gin.H{"status": "ok"})
+			queue := players[YOUR_SERVER_ID].Queue
+			if queue == nil {
+				ctx.JSON(http.StatusOK, gin.H{"queue": "Is empty"})
+			}
+			fmt.Println(queue)
+			ctx.JSON(http.StatusOK, gin.H{"queue": queue})
 		})
 
 		api.GET("/currentlyPlaying", func(ctx *gin.Context) {
-			ctx.JSON(http.StatusOK, gin.H{"status": "ok"})
+			currentSong := players[YOUR_SERVER_ID].CurrentSong
+			fmt.Println(currentSong)
+			ctx.JSON(http.StatusOK, gin.H{"CurrentSong": currentSong})
 		})
 
 		api.PATCH("/updatePlaylistName", func(ctx *gin.Context) {
