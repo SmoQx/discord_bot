@@ -50,7 +50,7 @@ func getOAuthConfig(r *http.Request) *oauth2.Config {
 	}
 }
 
-var YOUR_SERVER_ID = secret.ServerID // your guild ID from DB tmp
+var YOUR_SERVER_ID = "" // your guild ID from DB tmp
 
 func GetSongs(ctx *gin.Context, db *sql.DB) {
 	songs, err := crud.GetSongs(db)
@@ -60,6 +60,27 @@ func GetSongs(ctx *gin.Context, db *sql.DB) {
 	}
 
 	ctx.JSON(http.StatusOK, songs)
+}
+
+func GetVideoID(ctx *gin.Context, query string) {
+	songs, err := GetVideoIDFromQuerry4(query)
+	if err != nil {
+		fmt.Println(err)
+		ctx.JSON(http.StatusNotFound, gin.H{"error": "there was an error while trying to find"})
+		return
+	}
+
+	var result []gin.H
+	for _, song := range songs {
+		result = append(result, gin.H{
+			"title":    song.Title,
+			"filename": song.Filename,
+			"channel":  "tester",
+			"duration": "4:30",
+		})
+	}
+
+	ctx.JSON(http.StatusOK, result)
 }
 
 func GetPlaylists(ctx *gin.Context, db *sql.DB) {
@@ -272,7 +293,13 @@ func RunServer(db *sql.DB) {
 		})
 
 		api.GET("/searchYT", func(ctx *gin.Context) {
-			ctx.JSON(http.StatusOK, gin.H{"status": "ok"})
+			query := ctx.Query("query")
+			if query == "" {
+				ctx.JSON(http.StatusBadRequest, gin.H{"error": "query is required"})
+				return
+			}
+			fmt.Println(query)
+			GetVideoID(ctx, query)
 		})
 
 		api.GET("/queue", func(ctx *gin.Context) {

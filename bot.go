@@ -618,6 +618,39 @@ func GetVideoIDFromLink(link string) (Song, error) {
 	}, nil
 }
 
+func GetVideoIDFromQuerry4(query string) ([]Song, error) {
+	searchQuery := fmt.Sprintf("ytsearch4:%s", query)
+	dl := ytdlp.New().
+		PrintJSON().
+		NoProgress().
+		SkipDownload().
+		CookiesFromBrowser("firefox").
+		NoPlaylist().
+		ExtractorArgs("youtube:player_js_variant=tv")
+
+	r, err := dl.Run(context.Background(), searchQuery)
+	if err != nil {
+		return nil, err
+	}
+
+	var songs []Song
+	decoder := json.NewDecoder(strings.NewReader(r.Stdout))
+	for decoder.More() {
+		var data map[string]any
+		if err := decoder.Decode(&data); err != nil {
+			return nil, err
+		}
+		id, _ := data["id"].(string)
+		title, _ := data["title"].(string)
+		songs = append(songs, Song{
+			Title:    title,
+			Filename: id + ".mp3",
+		})
+	}
+
+	return songs, nil
+}
+
 func GetVideoIDFromQuerry(query string) (Song, error) {
 
 	searchQuery := fmt.Sprintf("ytsearch1:%s", query)
@@ -626,7 +659,9 @@ func GetVideoIDFromQuerry(query string) (Song, error) {
 		PrintJSON().
 		NoProgress().
 		SkipDownload().
-		CookiesFromBrowser("brave")
+		CookiesFromBrowser("firefox").
+		NoPlaylist().
+		ExtractorArgs("youtube:player_js_variant=tv")
 
 	r, err := dl.Run(context.Background(), searchQuery)
 	if err != nil {

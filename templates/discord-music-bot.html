@@ -2507,7 +2507,7 @@
 
         const emojisThumbs = ['🎸', '🎹', '🎺', '🎷', '🎻'];
 
-        function ytSearch() {
+        async function ytSearch() {
             const q = document.getElementById('ytInput').value.trim();
             if (!q) return;
 
@@ -2515,41 +2515,43 @@
             const results = document.getElementById('ytResults');
             btn.disabled = true;
             results.innerHTML = `<div class="yt-searching"><div class="spinner"></div>Searching YouTube...</div>`;
-
             pushMsg('You', `Searching YouTube for: "${q}"`, 'user');
 
-            // Simulate API delay — replace with real fetch to YouTube Data API v3
-            // GET https://www.googleapis.com/youtube/v3/search?part=snippet&q=QUERY&type=video&videoCategoryId=10&key=YOUR_KEY
-            setTimeout(() => {
+            try {
+                const res = await apiFetch(`/api/searchYT?query=${encodeURIComponent(q)}`);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                console.log(data);
+
+                // data is a single object from your Go endpoint right now
+                // when you wire up real YT API it'll be an array — adjust accordingly
+                const resultItems = Array.isArray(data) ? data : [data];
+
+                results.innerHTML = resultItems.map((r, i) => `
+            <div class="yt-result-item">
+                <div class="yt-thumb">${emojisThumbs[i % emojisThumbs.length]}</div>
+                <div class="yt-result-info">
+                    <div class="yt-result-title" title="${r.title}">${r.title}</div>
+                    <div class="yt-result-meta">${r.channel} · ${r.duration}</div>
+                </div>
+                <div class="yt-result-actions">
+                    <button class="icon-btn" onclick="ytPlay(${i}, '${r.title.replace(/'/g, "\\'")}', '${r.duration}')" title="Play now">
+                        <svg viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21" fill="currentColor"/></svg>
+                    </button>
+                    <button class="icon-btn" onclick="ytQueue(${i}, '${r.title.replace(/'/g, "\\'")}', '${r.duration}')" title="Add to queue">
+                        <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    </button>
+                </div>
+            </div>
+        `).join('');
+
+                pushMsg('SOUNDWAVE', `Found ${resultItems.length} results for "${q}"`, 'bot');
+            } catch (err) {
+                results.innerHTML = `<div class="empty-state">No results found</div>`;
+                pushMsg('SYSTEM', `Search failed: ${err.message}`, 'system');
+            } finally {
                 btn.disabled = false;
-
-                // Generate mock results flavoured by the query
-                const generated = ytMockResults.map((r, i) => ({
-                    ...r,
-                    title: i === 0 ? q + ' (Official Audio)' : i === 1 ? q + ' - Remix' : r.title,
-                    videoId: 'mock_' + i,
-                }));
-
-                results.innerHTML = generated.slice(0, 4).map((r, i) => `
-      <div class="yt-result-item">
-        <div class="yt-thumb">${emojisThumbs[i % emojisThumbs.length]}</div>
-        <div class="yt-result-info">
-          <div class="yt-result-title" title="${r.title}">${r.title}</div>
-          <div class="yt-result-meta">${r.channel} · ${r.duration} · ${r.views} views</div>
-        </div>
-        <div class="yt-result-actions">
-          <button class="icon-btn" onclick="ytPlay(${i}, '${r.title.replace(/'/g, "\\'")}', '${r.duration}')" title="Play now">
-            <svg viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21" fill="currentColor"/></svg>
-          </button>
-          <button class="icon-btn" onclick="ytQueue(${i}, '${r.title.replace(/'/g, "\\'")}', '${r.duration}')" title="Add to queue">
-            <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          </button>
-        </div>
-      </div>
-    `).join('');
-
-                pushMsg('ANDRZEJ', `Found ${generated.length} results for "${q}"`, 'bot');
-            }, 900 + Math.random() * 500);
+            }
         }
 
         function ytPlay(idx, title, duration) {
