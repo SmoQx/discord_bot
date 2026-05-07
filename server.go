@@ -62,6 +62,11 @@ func GetSongs(ctx *gin.Context, db *sql.DB) {
 	ctx.JSON(http.StatusOK, songs)
 }
 
+func DownloadSelectedVideo(ctx *gin.Context, queryId string) {
+
+	ctx.JSON(http.StatusOK, gin.H{"message": "downloaded", "filename": filename})
+}
+
 func GetVideoID(ctx *gin.Context, query string) {
 	songs, err := GetVideoIDFromQuerry4(query)
 	if err != nil {
