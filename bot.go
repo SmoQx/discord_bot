@@ -624,6 +624,8 @@ func GetVideoIDFromQuerry4(query string) ([]Song, error) {
 		PrintJSON().
 		NoProgress().
 		SkipDownload().
+		Format("bestaudio").
+		AudioFormat("mp3").ExtractorArgs("youtube:player_js_variant=tv").
 		CookiesFromBrowser("firefox").
 		NoPlaylist().
 		ExtractorArgs("youtube:player_js_variant=tv")
