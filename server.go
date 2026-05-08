@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
@@ -63,8 +64,13 @@ func GetSongs(ctx *gin.Context, db *sql.DB) {
 }
 
 func DownloadSelectedVideo(ctx *gin.Context, queryId string) {
+	err := DownloadVideo(queryId)
 
-	ctx.JSON(http.StatusOK, gin.H{"message": "downloaded", "filename": filename})
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to download video"})
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"message": "downloaded"})
 }
 
 func GetVideoID(ctx *gin.Context, query string) {
@@ -297,6 +303,21 @@ func RunServer(db *sql.DB) {
 			GetPlaylists(ctx, db)
 		})
 
+		api.POST("/playThis", func(ctx *gin.Context) {
+			var body struct {
+				SongId   string `json:"SongId"`
+				SongName string `json:"SongName"`
+			}
+
+			if err := ctx.ShouldBindJSON(&body); err != nil {
+				ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+			ctx.JSON(http.StatusOK, gin.H{
+				"message": "ok",
+			})
+		})
+
 		api.GET("/searchYT", func(ctx *gin.Context) {
 			query := ctx.Query("query")
 			if query == "" {
@@ -307,13 +328,28 @@ func RunServer(db *sql.DB) {
 			GetVideoID(ctx, query)
 		})
 
-		api.GET("/queue", func(ctx *gin.Context) {
-			queue := players[YOUR_SERVER_ID].Queue
-			if queue == nil {
-				ctx.JSON(http.StatusOK, gin.H{"queue": "Is empty"})
+		api.GET("/downloadYT", func(ctx *gin.Context) {
+			query := ctx.Query("query")
+			if query == "" {
+				ctx.JSON(http.StatusBadRequest, gin.H{"error": "query is required"})
+				return
 			}
-			fmt.Println(queue)
-			ctx.JSON(http.StatusOK, gin.H{"queue": queue})
+
+			videoId := strings.Split(query, ".")[0]
+
+			fmt.Println(videoId)
+			DownloadSelectedVideo(ctx, videoId)
+		})
+
+		api.GET("/queue", func(ctx *gin.Context) {
+			// queue := players[YOUR_SERVER_ID].Queue
+			moqqueue := []Song{Song{Title: "test", Filename: "1"}, Song{Title: "test2", Filename: "2"}}
+			// if queue == nil {
+			// 	ctx.JSON(http.StatusOK, gin.H{"queue": "Is empty"})
+			// }
+			// fmt.Println(queue)
+			fmt.Println(moqqueue)
+			ctx.JSON(http.StatusOK, gin.H{"queue": moqqueue})
 		})
 
 		api.POST("/queue/add", func(ctx *gin.Context) {
@@ -327,7 +363,7 @@ func RunServer(db *sql.DB) {
 				return
 			}
 
-			players[YOUR_SERVER_ID].Queue = append(players[YOUR_SERVER_ID].Queue, Song{body.SongId, body.SongName})
+			// players[YOUR_SERVER_ID].Queue = append(players[YOUR_SERVER_ID].Queue, Song{body.SongId, body.SongName})
 		})
 
 		api.GET("/currentlyPlaying", func(ctx *gin.Context) {

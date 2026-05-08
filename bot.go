@@ -618,11 +618,14 @@ func GetVideoIDFromLink(link string) (Song, error) {
 	}, nil
 }
 
-func DownloadVideo(filename string, videoID string) {
+func DownloadVideo(videoID string) error {
+	if CheckIfCachedMusic(videoID + ".mp3") {
+		return nil
+	}
+
 	dl := ytdlp.New().
 		ExtractAudio().
 		AudioFormat("mp3").
-		AudioQuality("0").
 		Output("downloads/%(id)s.%(ext)s").
 		CookiesFromBrowser("firefox").
 		NoPlaylist().
@@ -631,8 +634,9 @@ func DownloadVideo(filename string, videoID string) {
 	_, err := dl.Run(context.Background(), "https://www.youtube.com/watch?v="+videoID)
 	if err != nil {
 		fmt.Println(err)
-		return
+		return err
 	}
+	return nil
 }
 
 func GetVideoIDFromQuerry4(query string) ([]Song, error) {

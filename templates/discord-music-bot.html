@@ -1911,6 +1911,7 @@
         let songs = [];
         let playlists = [];
         let queue = [];
+        let ytsearchResult = [];
         let currentSongId = "";
         let isPlaying = false;
         let isShuffle = false;
@@ -1964,7 +1965,12 @@
         // ─── RENDER QUEUE (with drag-and-drop) ───
         let dragSrcIdx = null;
 
-        function renderQueue() {
+        async function renderQueue() {
+            const res = await apiFetch(`/api/queue`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            queue = data.queue;
+
             const el = document.getElementById('queueList');
             document.getElementById('queueBadge').textContent = queue.length;
             if (!queue.length) {
@@ -2053,7 +2059,6 @@
         }
 
         async function addToQueue(id) {
-            queue.push(id);
             try {
                 const res = await fetch(`${API}/api/queue/add`, {
                     method: 'POST',
@@ -2064,6 +2069,7 @@
                     })
                 });
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                queue.push(id);
                 renderQueue();
                 toast(`Added "${getSong(id).title}" to queue`, 'success');
             }
@@ -2094,11 +2100,24 @@
             renderSongs(document.getElementById('songSearch').value);
         }
 
-        function playSong(id) {
+        async function playSong(id) {
             if (currentSongId === id) {togglePlay(); return;}
             currentSongId = id;
             progress = 0;
             isPlaying = true;
+            try {
+                const res2 = await fetch(`${API}/api/playThis`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        SongId: ytsearchResult[idx].filename,
+                        SongName: ytsearchResult[idx].title
+                    })
+                });
+                if (!res2.ok) throw new Error(`HTTP ${res2.status}`);
+            } catch (err) {
+                pushMsg('SYSTEM', `Play failed: ${err.message}`, 'system');
+            }
             updateNowPlaying();
             updatePlayBtn();
             startProgress();
@@ -2526,7 +2545,7 @@
                 // data is a single object from your Go endpoint right now
                 // when you wire up real YT API it'll be an array — adjust accordingly
                 const resultItems = Array.isArray(data) ? data : [data];
-
+                ytsearchResult = resultItems;
                 results.innerHTML = resultItems.map((r, i) => `
             <div class="yt-result-item">
                 <div class="yt-thumb">${emojisThumbs[i % emojisThumbs.length]}</div>
@@ -2554,25 +2573,50 @@
             }
         }
 
-        function ytPlay(idx, title, duration) {
+        async function ytPlay(idx, title, duration) {
             // In real implementation: send play command to bot via your API/WebSocket
             // The bot would then join voice and stream from YouTube
-            const newId = 'yt_' + Date.now();
-            songs.push({id: newId, title, server: 'youtube', played_counter: 0});
-            playSong(newId);
-            document.getElementById('ytResults').innerHTML = '';
-            document.getElementById('ytInput').value = '';
-            pushMsg('ANDRZEJ', `Now playing: "${title}" [YouTube] ▶`, 'bot');
-            toast(`Playing "${title}"`, 'success');
+
+            try {
+                const res = await apiFetch(`/api/downloadYT?query=${encodeURIComponent(ytsearchResult[idx].filename)}`);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                const newId = 'yt_' + Date.now();
+                songs.push({id: newId, title, server: 'youtube', played_counter: 0, filename: ytsearchResult[idx].filename});
+                playSong(newId);
+                document.getElementById('ytResults').innerHTML = '';
+                document.getElementById('ytInput').value = '';
+                pushMsg('ANDRZEJ', `Now playing: "${title}" [YouTube] ▶`, 'bot');
+                toast(`Playing "${title}"`, 'success');
+            } catch (err) {
+                pushMsg('SYSTEM', `Download failed: ${err.message}`, 'system');
+            }
         }
 
-        function ytQueue(idx, title, duration) {
+        async function ytQueue(idx, title, duration) {
             const newId = 'yt_' + Date.now() + '_' + idx;
-            songs.push({id: newId, title, server: 'youtube', played_counter: 0});
-            queue.push(newId);
-            renderQueue();
-            pushMsg('ANDRZEJ', `Added to queue: "${title}" [YouTube]`, 'bot');
-            toast(`Queued "${title}"`, 'success');
+
+            try {
+                const res = await apiFetch(`/api/downloadYT?query=${encodeURIComponent(ytsearchResult[idx].filename)}`);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                songs.push({id: newId, title, server: 'youtube', played_counter: 0, filename: ytsearchResult[idx].filename});
+                const res2 = await fetch(`${API}/api/queue/add`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        SongId: ytsearchResult[idx].filename,
+                        SongName: ytsearchResult[idx].title
+                    })
+                });
+                if (!res2.ok) throw new Error(`HTTP ${res2.status}`);
+                queue.push(newId);
+                renderQueue();
+                pushMsg('ANDRZEJ', `Added to queue: "${title}" [YouTube]`, 'bot');
+                toast(`Queued "${title}"`, 'success');
+            } catch (err) {
+                pushMsg('SYSTEM', `Download failed: ${err.message}`, 'system');
+            }
         }
 
         // ─── INIT ───
