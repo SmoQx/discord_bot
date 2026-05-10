@@ -629,7 +629,7 @@ func DownloadVideo(videoID string) error {
 		ExtractAudio().
 		AudioFormat("mp3").
 		Output("./cache/%(id)s.%(ext)s").
-		CookiesFromBrowser("firefox").
+		CookiesFromBrowser("brave").
 		NoPlaylist().
 		ExtractorArgs("youtube:player_js_variant=tv")
 
@@ -649,7 +649,7 @@ func GetVideoIDFromQuerry4(query string) ([]Song, error) {
 		SkipDownload().
 		Format("bestaudio").
 		AudioFormat("mp3").ExtractorArgs("youtube:player_js_variant=tv").
-		CookiesFromBrowser("firefox").
+		CookiesFromBrowser("brave").
 		NoPlaylist().
 		ExtractorArgs("youtube:player_js_variant=tv")
 
@@ -684,7 +684,7 @@ func GetVideoIDFromQuerry(query string) (Song, error) {
 		PrintJSON().
 		NoProgress().
 		SkipDownload().
-		CookiesFromBrowser("firefox").
+		CookiesFromBrowser("brave").
 		NoPlaylist().
 		ExtractorArgs("youtube:player_js_variant=tv")
 
