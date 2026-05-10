@@ -278,6 +278,8 @@ func PlayMusicFromInteraction(player *VoicePlayer, song Song, discord *discordgo
 		Content: "Now playing: **" + song.Title + "**",
 	})
 
+	player.CurrentSong = song
+
 	vc.Speaking(true)
 	ffmpeg := exec.Command("ffmpeg", "-i", "./cache/"+song.Filename, "-f", "s16le", "-ar", "48000", "-ac", "2", "pipe:1")
 	player.FFmpegCmd = ffmpeg
@@ -342,7 +344,7 @@ func PlayMusicFromInteraction(player *VoicePlayer, song Song, discord *discordgo
 
 	if player.AutoAdvance && len(player.Queue) > 0 {
 		next := player.Queue[0]
-		player.CurrentSong = player.Queue[0]
+		// player.CurrentSong = player.Queue[0]
 		player.Queue = player.Queue[1:]
 		go PlayMusicFromInteraction(player, next, discord, i)
 	} else if !player.AutoAdvance {
@@ -626,7 +628,7 @@ func DownloadVideo(videoID string) error {
 	dl := ytdlp.New().
 		ExtractAudio().
 		AudioFormat("mp3").
-		Output("downloads/%(id)s.%(ext)s").
+		Output("./cache/%(id)s.%(ext)s").
 		CookiesFromBrowser("firefox").
 		NoPlaylist().
 		ExtractorArgs("youtube:player_js_variant=tv")

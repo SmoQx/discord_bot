@@ -51,7 +51,7 @@ func getOAuthConfig(r *http.Request) *oauth2.Config {
 	}
 }
 
-var YOUR_SERVER_ID = "" // your guild ID from DB tmp
+var YOUR_SERVER_ID = "684480426446028822" // your guild ID from DB tmp
 
 func GetSongs(ctx *gin.Context, db *sql.DB) {
 	songs, err := crud.GetSongs(db)
@@ -97,7 +97,7 @@ func GetVideoID(ctx *gin.Context, query string) {
 func GetPlaylists(ctx *gin.Context, db *sql.DB) {
 	playlists, err := crud.GetPlayLists(db)
 
-	fmt.Println(playlists)
+	// fmt.Println(playlists)
 
 	if err != nil {
 		ctx.JSON(http.StatusNotFound, nil)
@@ -342,14 +342,23 @@ func RunServer(db *sql.DB) {
 		})
 
 		api.GET("/queue", func(ctx *gin.Context) {
-			// queue := players[YOUR_SERVER_ID].Queue
-			moqqueue := []Song{Song{Title: "test", Filename: "1"}, Song{Title: "test2", Filename: "2"}}
-			// if queue == nil {
-			// 	ctx.JSON(http.StatusOK, gin.H{"queue": "Is empty"})
-			// }
-			// fmt.Println(queue)
-			fmt.Println(moqqueue)
-			ctx.JSON(http.StatusOK, gin.H{"queue": moqqueue})
+			type QueueItem struct {
+				Id     string `json:"id"`
+				Title  string `json:"title"`
+				Server string `json:"server"`
+			}
+
+			queue := players[YOUR_SERVER_ID].Queue
+			items := make([]QueueItem, len(queue))
+			for i, song := range queue {
+				items[i] = QueueItem{
+					Id:     strings.TrimSuffix(song.Filename, ".mp3"),
+					Title:  song.Title,
+					Server: YOUR_SERVER_ID,
+				}
+			}
+
+			ctx.JSON(http.StatusOK, items)
 		})
 
 		api.POST("/queue/add", func(ctx *gin.Context) {
@@ -362,14 +371,25 @@ func RunServer(db *sql.DB) {
 				ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 				return
 			}
+			fmt.Println(players[YOUR_SERVER_ID].Queue)
 
-			// players[YOUR_SERVER_ID].Queue = append(players[YOUR_SERVER_ID].Queue, Song{body.SongId, body.SongName})
+			players[YOUR_SERVER_ID].Queue = append(players[YOUR_SERVER_ID].Queue, Song{Filename: body.SongId, Title: body.SongName})
 		})
 
 		api.GET("/currentlyPlaying", func(ctx *gin.Context) {
+			type NowPlayingItem struct {
+				Id     string `json:"id"`
+				Title  string `json:"title"`
+				Server string `json:"server"`
+			}
 			currentSong := players[YOUR_SERVER_ID].CurrentSong
 			fmt.Println(currentSong)
-			ctx.JSON(http.StatusOK, gin.H{"CurrentSong": currentSong})
+			item := NowPlayingItem{
+				Id:     strings.TrimSuffix(currentSong.Filename, ".mp3"),
+				Title:  currentSong.Title,
+				Server: YOUR_SERVER_ID,
+			}
+			ctx.JSON(http.StatusOK, gin.H{"CurrentSong": item})
 		})
 
 		api.PATCH("/updatePlaylistName", func(ctx *gin.Context) {

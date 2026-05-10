@@ -1861,6 +1861,7 @@
                 document.getElementById('app').style.display = 'block';
                 loadSongs();
                 loadPlaylists();
+                syncQueue();
                 renderQueue();
                 updateNowPlaying();
                 updatePlayBtn();
@@ -1921,6 +1922,7 @@
         let addToPlaylistSongId = null;
         let progressInterval = null;
         let nextPlaylistId = 4;
+        let queueDirty = false;  // ← add this
 
         function getSong(id) {return songs.find(s => s.id === id);}
         function getEmoji(id) {return emojis[songs.findIndex(s => s.id === id) % emojis.length];}
@@ -1965,12 +1967,7 @@
         // ─── RENDER QUEUE (with drag-and-drop) ───
         let dragSrcIdx = null;
 
-        async function renderQueue() {
-            const res = await apiFetch(`/api/queue`);
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const data = await res.json();
-            queue = data.queue;
-
+        function renderQueue() {
             const el = document.getElementById('queueList');
             document.getElementById('queueBadge').textContent = queue.length;
             if (!queue.length) {
@@ -1978,26 +1975,37 @@
                 return;
             }
 
-            el.innerHTML = queue.map((id, i) => {
-                const s = getSong(id);
-                return `<div class="queue-item"
-        draggable="true"
-        data-idx="${i}"
-        ondragstart="onDragStart(event, ${i})"
-        ondragover="onDragOver(event)"
-        ondragleave="onDragLeave(event)"
-        ondrop="onDrop(event, ${i})"
-        ondragend="onDragEnd(event)">
-      <div class="drag-handle"><span></span><span></span><span></span></div>
-      <span class="queue-pos">${i + 1}</span>
-      <div class="queue-thumb">${getEmoji(id)}</div>
-      <div class="queue-info">
-        <div class="queue-song-title">${s.title}</div>
-        <div class="queue-song-meta">#${s.server} · ${fmtTime(getDuration(id))}</div>
-      </div>
-      <button class="remove-btn" onclick="event.stopPropagation(); removeFromQueue(${i})" title="Remove">✕</button>
-    </div>`;
-            }).join('');
+            el.innerHTML = queue.map((item, i) => `
+                <div class="queue-item"
+                    draggable="true"
+                    data-idx="${i}"
+                    ondragstart="onDragStart(event, ${i})"
+                    ondragover="onDragOver(event)"
+                    ondragleave="onDragLeave(event)"
+                    ondrop="onDrop(event, ${i})"
+                    ondragend="onDragEnd(event)">
+                    <div class="drag-handle"><span></span><span></span><span></span></div>
+                    <span class="queue-pos">${i + 1}</span>
+                    <div class="queue-thumb">🎵</div>
+                    <div class="queue-info">
+                        <div class="queue-song-title">${item.title}</div>
+                        <div class="queue-song-meta">#${item.server}</div>
+                    </div>
+                    <button class="remove-btn" onclick="event.stopPropagation(); removeFromQueue(${i})" title="Remove">✕</button>
+                </div>
+            `).join('');
+        }
+
+        async function syncQueue() {
+            if (queueDirty) return;
+            try {
+                const res = await apiFetch('/api/queue');
+                if (!res.ok) return;
+                queue = await res.json(); // [{ id, title, server }, ...]
+                renderQueue();
+            } catch (err) {
+                // silently fail
+            }
         }
 
         function onDragStart(e, idx) {
@@ -2058,24 +2066,22 @@
             });
         }
 
-        async function addToQueue(id) {
-            try {
-                const res = await fetch(`${API}/api/queue/add`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        SongId: getSong(id).id,
-                        SongName: getSong(id).title
-                    })
-                });
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                queue.push(id);
+        function addToQueue(id) {
+            const song = getSong(id);
+            if (!song) return;
+            queueDirty = true;
+            apiFetch('/api/queue/add', {
+                method: 'POST',
+                body: JSON.stringify({ SongId: id, SongName: song.title })
+            }).then(() => {
+                queue.push({ id: song.id, title: song.title, server: song.server });
                 renderQueue();
-                toast(`Added "${getSong(id).title}" to queue`, 'success');
-            }
-            catch (err) {
-                toast(`Added "${getSong(id).title}" to queue`, 'fail');
-            }
+                toast(`Added "${song.title}" to queue`, 'success');
+            }).catch(err => {
+                pushMsg('SYSTEM', `Failed to add to queue: ${err.message}`, 'system');
+            }).finally(() => {
+                queueDirty = false;
+            });
         }
 
         function removeFromQueue(idx) {
@@ -2090,14 +2096,29 @@
         }
 
         // ─── NOW PLAYING ───
-        function updateNowPlaying() {
-            const s = getSong(currentSongId);
-            if (!s) return;
-            document.getElementById('npTitle').textContent = s.title;
-            document.getElementById('npSub').textContent = `#${s.server} — server`;
-            document.getElementById('npArtwork').textContent = getEmoji(currentSongId);
-            document.getElementById('timeTotal').textContent = fmtTime(getDuration(currentSongId));
-            renderSongs(document.getElementById('songSearch').value);
+        async function updateNowPlaying() {
+            try {
+                const res = await apiFetch('/api/currentlyPlaying');
+                if (!res.ok) return;
+                const data = await res.json();
+                const song = data.CurrentSong;
+                if (!song || !song.Title) {
+                    document.getElementById('npTitle').textContent = 'Nothing playing';
+                    document.getElementById('npSub').textContent = '—';
+                    document.getElementById('npArtwork').textContent = '🎵';
+                    return;
+                }
+
+                document.getElementById('npTitle').textContent = song.Title;
+                document.getElementById('npSub').textContent = `#${song.Server || ''}`;
+                document.getElementById('npArtwork').textContent = '🎵';
+
+                // update currentSongId so the song list highlights correctly
+                currentSongId = song.Filename ? song.Filename.replace('.mp3', '') : '';
+                renderSongs(document.getElementById('songSearch').value);
+            } catch (err) {
+                // silently fail — non critical
+            }
         }
 
         async function playSong(id) {
@@ -2369,11 +2390,28 @@
             }
         }
 
-        function queuePlaylist(id) {
+        async function queuePlaylist(id) {
+            id = parseInt(id);
             const pl = playlists.find(p => p.id === id);
-            queue.push(...pl.songs.filter(s => !queue.includes(s)));
-            renderQueue();
-            toast(`Added ${pl.songs.length} tracks to queue`, 'success');
+            if (!pl) return;
+
+            const existingIds = queue.map(q => q.id);
+            const toAdd = pl.songs.filter(s => !existingIds.includes(s));
+            if (!toAdd.length) { toast('All songs already in queue', 'info'); return; }
+
+            try {
+                await Promise.all(toAdd.map(songId => {
+                    const song = getSong(songId);
+                    return apiFetch('/api/queue/add', {
+                        method: 'POST',
+                        body: JSON.stringify({ SongId: songId, SongName: song ? song.title : songId })
+                    });
+                }));
+                await syncQueue(); // reload from server
+                toast(`Added ${toAdd.length} tracks to queue`, 'success');
+            } catch (err) {
+                pushMsg('SYSTEM', `Failed to queue playlist: ${err.message}`, 'system');
+            }
         }
 
         // ─── ADD TO PLAYLIST ───
@@ -2621,6 +2659,8 @@
 
         // ─── INIT ───
         checkAuth();
+        setInterval(syncQueue, 2000);
+        setInterval(updateNowPlaying, 2000);
     </script>
 </body>
 
