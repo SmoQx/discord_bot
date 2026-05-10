@@ -239,7 +239,7 @@ func handleCallback(c *gin.Context) {
 	session.Save()
 
 	// redirect to frontend
-	c.Redirect(http.StatusTemporaryRedirect, ":8080")
+	c.Redirect(http.StatusTemporaryRedirect, ":69696")
 }
 
 // middleware — protects all /api routes
@@ -463,5 +463,5 @@ func RunServer(db *sql.DB) {
 		ctx.HTML(http.StatusOK, "discord-music-bot.html", nil)
 	})
 
-	router.Run(":8080")
+	router.Run(":69696")
 }
