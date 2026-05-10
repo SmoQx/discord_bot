@@ -70,7 +70,7 @@ func Run(token string, db *sql.DB) {
 	// 	newMessage(s, m, db) // pass db yourself
 	// })
 
-	discord.AddHandler(voiceStateUpdate)
+	// discord.AddHandler(voiceStateUpdate)
 
 	discord.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		newCommand(s, i, db)
