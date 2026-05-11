@@ -313,8 +313,10 @@ func PlayMusicFromInteraction(player *VoicePlayer, song Song, discord *discordgo
 	encoder, _ := gopus.NewEncoder(48000, 2, gopus.Audio)
 	pcm := make([]int16, 960*2) // 20ms stereo
 
+	framesSent := 0
 	for {
 		if err := binary.Read(ffmpegOut, binary.LittleEndian, pcm); err != nil {
+			fmt.Printf("ffmpeg read ended after %d frames: %v\n", framesSent, err)
 			break
 		}
 		opus, err := encoder.Encode(pcm, 960, 960*2*2)
@@ -324,15 +326,12 @@ func PlayMusicFromInteraction(player *VoicePlayer, song Song, discord *discordgo
 		}
 		select {
 		case vc.OpusSend <- opus:
-			// sent OK
-
+			framesSent++
+			if framesSent%500 == 0 {
+				fmt.Printf("Sent %d opus frames so far\n", framesSent)
+			}
 		case <-time.After(200 * time.Millisecond):
-			fmt.Println("opus send timeout — dropping frame")
-			// drop frame instead of blocking
-		}
-
-		if !player.Playing {
-			break
+			fmt.Printf("opus send timeout at frame %d\n", framesSent)
 		}
 	}
 
