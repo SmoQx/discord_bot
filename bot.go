@@ -847,7 +847,7 @@ func ShowPlayStatsForInteraction(discord *discordgo.Session, message *discordgo.
 	if err != nil {
 		fmt.Println("Error while reading from database :", err)
 	}
-	fmt.Println(songs)
+	// fmt.Println(songs)
 
 	sort.Slice(songs, func(i, j int) bool {
 		return songs[i].Played_counter > songs[j].Played_counter
@@ -1179,8 +1179,8 @@ func MainBOT(db *sql.DB) {
 	ytdlp.MustInstallFFmpeg(context.Background(), nil)
 	ytdlp.MustInstallFFprobe(context.Background(), nil)
 
-	fmt.Println(ytdlp.Version)
+	fmt.Println("yt-dlp version: ", ytdlp.Version)
 
-	fmt.Println(ytdlp.GetCacheDir())
+	// fmt.Println(ytdlp.GetCacheDir())
 	Run(config.BotToken, db)
 }
