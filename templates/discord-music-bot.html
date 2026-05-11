@@ -2034,7 +2034,7 @@
             e.currentTarget.classList.remove('drag-over-top', 'drag-over-bottom');
         }
 
-        function onDrop(e, targetIdx) {
+        async function onDrop(e, targetIdx) {
             e.preventDefault();
             clearDragStyles();
             if (dragSrcIdx === null || dragSrcIdx === targetIdx) return;
@@ -2044,15 +2044,27 @@
             const insertAfter = e.clientY >= rect.top + rect.height / 2;
             let insertAt = insertAfter ? targetIdx + 1 : targetIdx;
 
-            // Remove from old position
             const [moved] = queue.splice(dragSrcIdx, 1);
-            // Adjust insert index if we removed before it
             if (dragSrcIdx < insertAt) insertAt--;
             queue.splice(insertAt, 0, moved);
 
             dragSrcIdx = null;
             renderQueue();
-            pushMsg('ANDRZEJ', `Queue reordered — "${getSong(moved).title}" moved to position ${insertAt + 1}`, 'bot');
+            pushMsg('ANDRZEJ', `Queue reordered — "${moved.title}" moved to position ${insertAt + 1}`, 'bot');
+
+            // sync new order to bot
+            try {
+                queueDirty = true;
+                const res = await apiFetch('/api/queue/update', {
+                    method: 'POST',
+                    body: JSON.stringify(queue.map(q => ({id: q.id, title: q.title})))
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            } catch (err) {
+                pushMsg('SYSTEM', `Failed to sync queue order: ${err.message}`, 'system');
+            } finally {
+                queueDirty = false;
+            }
         }
 
         function onDragEnd(e) {
@@ -2072,9 +2084,9 @@
             queueDirty = true;
             apiFetch('/api/queue/add', {
                 method: 'POST',
-                body: JSON.stringify({ SongId: id, SongName: song.title })
+                body: JSON.stringify({SongId: id, SongName: song.title})
             }).then(() => {
-                queue.push({ id: song.id, title: song.title, server: song.server });
+                queue.push({id: song.id, title: song.title, server: song.server});
                 renderQueue();
                 toast(`Added "${song.title}" to queue`, 'success');
             }).catch(err => {
@@ -2084,15 +2096,41 @@
             });
         }
 
-        function removeFromQueue(idx) {
+        async function removeFromQueue(idx) {
             queue.splice(idx, 1);
             renderQueue();
+
+            try {
+                queueDirty = true;
+                const res = await apiFetch('/api/queue/update', {
+                    method: 'POST',
+                    body: JSON.stringify(queue.map(q => ({id: q.id, title: q.title})))
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            } catch (err) {
+                pushMsg('SYSTEM', `Failed to sync queue: ${err.message}`, 'system');
+            } finally {
+                queueDirty = false;
+            }
         }
 
-        function clearQueue() {
+        async function clearQueue() {
             queue = [];
             renderQueue();
-            toast('Queue cleared', 'info');
+
+            try {
+                queueDirty = true;
+                const res = await apiFetch('/api/queue/update', {
+                    method: 'POST',
+                    body: JSON.stringify([]) // empty array clears the queue
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                toast('Queue cleared', 'info');
+            } catch (err) {
+                pushMsg('SYSTEM', `Failed to clear queue: ${err.message}`, 'system');
+            } finally {
+                queueDirty = false;
+            }
         }
 
         // ─── NOW PLAYING ───
@@ -2102,15 +2140,15 @@
                 if (!res.ok) return;
                 const data = await res.json();
                 const song = data.CurrentSong;
-                if (!song || !song.Title) {
+                if (!song || !song.title) {
                     document.getElementById('npTitle').textContent = 'Nothing playing';
                     document.getElementById('npSub').textContent = '—';
                     document.getElementById('npArtwork').textContent = '🎵';
                     return;
                 }
 
-                document.getElementById('npTitle').textContent = song.Title;
-                document.getElementById('npSub').textContent = `#${song.Server || ''}`;
+                document.getElementById('npTitle').textContent = song.title;
+                document.getElementById('npSub').textContent = `#${song.server || ''}`;
                 document.getElementById('npArtwork').textContent = '🎵';
 
                 // update currentSongId so the song list highlights correctly
@@ -2126,13 +2164,14 @@
             currentSongId = id;
             progress = 0;
             isPlaying = true;
+            song = getSong(id);
             try {
                 const res2 = await fetch(`${API}/api/playThis`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
-                        SongId: ytsearchResult[idx].filename,
-                        SongName: ytsearchResult[idx].title
+                        SongId: song.filename,
+                        SongName: song.title
                     })
                 });
                 if (!res2.ok) throw new Error(`HTTP ${res2.status}`);
@@ -2397,14 +2436,14 @@
 
             const existingIds = queue.map(q => q.id);
             const toAdd = pl.songs.filter(s => !existingIds.includes(s));
-            if (!toAdd.length) { toast('All songs already in queue', 'info'); return; }
+            if (!toAdd.length) {toast('All songs already in queue', 'info'); return;}
 
             try {
                 await Promise.all(toAdd.map(songId => {
                     const song = getSong(songId);
                     return apiFetch('/api/queue/add', {
                         method: 'POST',
-                        body: JSON.stringify({ SongId: songId, SongName: song ? song.title : songId })
+                        body: JSON.stringify({SongId: songId, SongName: song ? song.title : songId})
                     });
                 }));
                 await syncQueue(); // reload from server

@@ -25,6 +25,12 @@ type Secret struct {
 
 var secret Secret
 
+var queueMoqup []Song = []Song{
+	{Filename: "1.mp3", Title: "asdf"},
+	{Filename: "2.mp3", Title: "test"},
+	{Filename: "3.mp3", Title: "test2"},
+}
+
 func getOAuthConfig(r *http.Request) *oauth2.Config {
 
 	bytes, err := os.ReadFile("secret.json") // replaces ioutil.ReadFile
@@ -182,8 +188,8 @@ func handleLogout(c *gin.Context) {
 func handleCallback(c *gin.Context) {
 	code := c.Query("code")
 	token, err := getOAuthConfig(c.Request).Exchange(c, code)
-	fmt.Println(token)
-	fmt.Println(code)
+	// fmt.Println(token)
+	// fmt.Println(code)
 	fmt.Println(err)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "token exchange failed"})
@@ -239,7 +245,7 @@ func handleCallback(c *gin.Context) {
 	session.Save()
 
 	// redirect to frontend
-	c.Redirect(http.StatusTemporaryRedirect, ":6969")
+	c.Redirect(http.StatusTemporaryRedirect, "/")
 }
 
 // middleware — protects all /api routes
@@ -247,7 +253,7 @@ func authMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		session := sessions.Default(c)
 		userID := session.Get("user_id")
-		fmt.Println(userID)
+		// fmt.Println(userID)
 		if userID == nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
 			c.Abort()
@@ -324,7 +330,7 @@ func RunServer(db *sql.DB) {
 				ctx.JSON(http.StatusBadRequest, gin.H{"error": "query is required"})
 				return
 			}
-			fmt.Println(query)
+			// fmt.Println(query)
 			GetVideoID(ctx, query)
 		})
 
@@ -337,7 +343,7 @@ func RunServer(db *sql.DB) {
 
 			videoId := strings.Split(query, ".")[0]
 
-			fmt.Println(videoId)
+			// fmt.Println(videoId)
 			DownloadSelectedVideo(ctx, videoId)
 		})
 
@@ -349,6 +355,7 @@ func RunServer(db *sql.DB) {
 			}
 
 			queue := players[YOUR_SERVER_ID].Queue
+			// queue := queueMoqup
 			items := make([]QueueItem, len(queue))
 			for i, song := range queue {
 				items[i] = QueueItem{
@@ -371,9 +378,36 @@ func RunServer(db *sql.DB) {
 				ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 				return
 			}
-			fmt.Println(players[YOUR_SERVER_ID].Queue)
+			// fmt.Println(players[YOUR_SERVER_ID].Queue)
 
 			players[YOUR_SERVER_ID].Queue = append(players[YOUR_SERVER_ID].Queue, Song{Filename: body.SongId, Title: body.SongName})
+			// queueMoqup = append(queueMoqup, Song{Filename: body.SongId, Title: body.SongName})
+		})
+
+		api.POST("/queue/update", func(ctx *gin.Context) {
+			type QueueItem struct {
+				Id    string `json:"id"`
+				Title string `json:"title"`
+			}
+
+			var items []QueueItem
+			if err := ctx.ShouldBindJSON(&items); err != nil {
+				ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+
+			// rebuild the queue from the reordered items
+			newQueue := make([]Song, len(items))
+			for i, item := range items {
+				newQueue[i] = Song{
+					Filename: item.Id + ".mp3", // re-append the suffix
+					Title:    item.Title,
+				}
+			}
+
+			players[YOUR_SERVER_ID].Queue = newQueue
+			// queueMoqup = newQueue
+			ctx.JSON(http.StatusOK, gin.H{"updated": len(newQueue)})
 		})
 
 		api.GET("/currentlyPlaying", func(ctx *gin.Context) {
@@ -382,14 +416,23 @@ func RunServer(db *sql.DB) {
 				Title  string `json:"title"`
 				Server string `json:"server"`
 			}
-			currentSong := players[YOUR_SERVER_ID].CurrentSong
-			fmt.Println(currentSong)
+			// currentSong := players[YOUR_SERVER_ID].CurrentSong
+			// fmt.Println(currentSong)
+			// item := NowPlayingItem{
+			// 	Id:     strings.TrimSuffix(currentSong.Filename, ".mp3"),
+			// 	Title:  currentSong.Title,
+			// 	Server: YOUR_SERVER_ID,
+			// }
 			item := NowPlayingItem{
-				Id:     strings.TrimSuffix(currentSong.Filename, ".mp3"),
-				Title:  currentSong.Title,
+				Id:     "1",
+				Title:  "asdf",
 				Server: YOUR_SERVER_ID,
 			}
 			ctx.JSON(http.StatusOK, gin.H{"CurrentSong": item})
+		})
+
+		api.GET("/nextSong", func(ctx *gin.Context) {
+			ctx.JSON(http.StatusOK, gin.H{"message": "skipping"})
 		})
 
 		api.PATCH("/updatePlaylistName", func(ctx *gin.Context) {
