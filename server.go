@@ -323,6 +323,12 @@ func RunServer(db *sql.DB) {
 			}
 			currentSongMockup = Song{Title: body.SongName, Filename: body.SongId}
 
+			if players[YOUR_SERVER_ID] != nil {
+				players[YOUR_SERVER_ID].PlayMusicFromWeb(currentSongMockup)
+			} else {
+				ctx.JSON(http.StatusBadRequest, gin.H{"error": "there is no active player"})
+			}
+
 			ctx.JSON(http.StatusOK, gin.H{"message": "ok"})
 		})
 
@@ -355,9 +361,11 @@ func RunServer(db *sql.DB) {
 				Title  string `json:"title"`
 				Server string `json:"server"`
 			}
-
-			// queue := players[YOUR_SERVER_ID].Queue
-			queue := queueMoqup
+			if players[YOUR_SERVER_ID] == nil {
+				ctx.JSON(http.StatusBadRequest, gin.H{"error": "there is no active player"})
+			}
+			queue := players[YOUR_SERVER_ID].Queue
+			// queue := queueMoqup
 			items := make([]QueueItem, len(queue))
 			for i, song := range queue {
 				items[i] = QueueItem{
@@ -382,8 +390,12 @@ func RunServer(db *sql.DB) {
 			}
 			// fmt.Println(players[YOUR_SERVER_ID].Queue)
 
-			// players[YOUR_SERVER_ID].Queue = append(players[YOUR_SERVER_ID].Queue, Song{Filename: body.SongId, Title: body.SongName})
-			queueMoqup = append(queueMoqup, Song{Filename: body.SongId, Title: body.SongName})
+			if players[YOUR_SERVER_ID] == nil {
+				ctx.JSON(http.StatusBadRequest, gin.H{"error": "there is no active player"})
+			}
+
+			players[YOUR_SERVER_ID].Queue = append(players[YOUR_SERVER_ID].Queue, Song{Filename: body.SongId, Title: body.SongName})
+			// queueMoqup = append(queueMoqup, Song{Filename: body.SongId, Title: body.SongName})
 		})
 
 		api.POST("/queue/update", func(ctx *gin.Context) {
@@ -407,8 +419,12 @@ func RunServer(db *sql.DB) {
 				}
 			}
 
-			// players[YOUR_SERVER_ID].Queue = newQueue
-			queueMoqup = newQueue
+			if players[YOUR_SERVER_ID] == nil {
+				ctx.JSON(http.StatusBadRequest, gin.H{"error": "there is no active player"})
+			}
+
+			players[YOUR_SERVER_ID].Queue = newQueue
+			// queueMoqup = newQueue
 			ctx.JSON(http.StatusOK, gin.H{"updated": len(newQueue)})
 		})
 
@@ -418,19 +434,25 @@ func RunServer(db *sql.DB) {
 				Title  string `json:"title"`
 				Server string `json:"server"`
 			}
-			// currentSong := players[YOUR_SERVER_ID].CurrentSong
-			// fmt.Println(currentSong)
-			// item := NowPlayingItem{
-			// 	Id:     strings.TrimSuffix(currentSong.Filename, ".mp3"),
-			// 	Title:  currentSong.Title,
-			// 	Server: YOUR_SERVER_ID,
-			// }
+
+			if players[YOUR_SERVER_ID] == nil {
+				ctx.JSON(http.StatusBadRequest, gin.H{"error": "there is no active player"})
+			}
+
+			currentSong := players[YOUR_SERVER_ID].CurrentSong
+
+			fmt.Println(currentSong)
 			item := NowPlayingItem{
-				Id:     strings.TrimSuffix(currentSongMockup.Filename, ".mp3"),
-				Title:  currentSongMockup.Title,
+				Id:     strings.TrimSuffix(currentSong.Filename, ".mp3"),
+				Title:  currentSong.Title,
 				Server: YOUR_SERVER_ID,
 			}
-			fmt.Println(currentSongMockup)
+			// item := NowPlayingItem{
+			// 	Id:     strings.TrimSuffix(currentSongMockup.Filename, ".mp3"),
+			// 	Title:  currentSongMockup.Title,
+			// 	Server: YOUR_SERVER_ID,
+			// }
+			// fmt.Println(currentSongMockup)
 			ctx.JSON(http.StatusOK, gin.H{"CurrentSong": item})
 		})
 

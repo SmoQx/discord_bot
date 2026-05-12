@@ -2160,13 +2160,11 @@
         }
 
         async function playSong(id) {
-            console.log(id);
             if (currentSongId === id) {togglePlay(); return;}
             currentSongId = id;
             progress = 0;
             isPlaying = true;
             song = getSong(id + ".mp3");
-            console.log("song id:", song.id, "song titiel", song.title);
             try {
                 const res2 = await fetch(`${API}/api/playThis`, {
                     method: 'POST',

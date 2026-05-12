@@ -41,6 +41,8 @@ type VoicePlayer struct {
 }
 
 var players = make(map[string]*VoicePlayer)
+var discordSession *discordgo.Session = nil
+var discordMessage *discordgo.MessageCreate = nil
 
 func checkNilErr(e error) {
 	if e != nil {
@@ -144,6 +146,10 @@ func Run(token string, db *sql.DB) {
 			fmt.Println("Cannot create '%v' command: %v", cmd.Name, err)
 		}
 	}
+
+	discordSession = &discordgo.Session{}
+	discordMessage = &discordgo.MessageCreate{}
+
 	fmt.Println("Bot started")
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
@@ -274,6 +280,7 @@ func PlayMusicFromInteraction(player *VoicePlayer, song Song, discord *discordgo
 	if vc.Status != 3 {
 		fmt.Println("error the voice client isnt ready")
 	}
+
 	discord.FollowupMessageCreate(i.Interaction, false, &discordgo.WebhookParams{
 		Content: "Now playing: **" + song.Title + "**",
 	})
@@ -359,13 +366,25 @@ func PlayMusicFromInteraction(player *VoicePlayer, song Song, discord *discordgo
 	}
 }
 
+func (v *VoicePlayer) PlayMusicFromWeb(song Song) {
+
+	PlayMusic(v, song, discordSession, discordMessage)
+}
+
 func PlayMusic(player *VoicePlayer, song Song, discord *discordgo.Session, message *discordgo.MessageCreate) {
 	// Start a fresh playback: allow auto-advance unless a skip/stop disables it
 	player.Playing = true
 	player.AutoAdvance = true
+	fmt.Println("play")
 
 	vc := player.VC
+	if vc.Status != 3 {
+		fmt.Println("error the voice client isnt ready")
+	}
+
 	discord.ChannelMessageSend(message.ChannelID, "Now playing: **"+song.Title+"**")
+
+	player.CurrentSong = song
 
 	vc.Speaking(true)
 	ffmpeg := exec.Command("ffmpeg", "-i", "./cache/"+song.Filename, "-f", "s16le", "-ar", "48000", "-ac", "2", "pipe:1")
@@ -383,18 +402,38 @@ func PlayMusic(player *VoicePlayer, song Song, discord *discordgo.Session, messa
 		return
 	}
 
+	discord.UpdateStatusComplex(discordgo.UpdateStatusData{
+		Status: "online",
+		Activities: []*discordgo.Activity{
+			{
+				Name: song.Title,
+				Type: discordgo.ActivityTypeListening,
+			},
+		},
+	})
+
 	encoder, _ := gopus.NewEncoder(48000, 2, gopus.Audio)
 	pcm := make([]int16, 960*2) // 20ms stereo
 
+	framesSent := 0
 	for {
 		if err := binary.Read(ffmpegOut, binary.LittleEndian, pcm); err != nil {
+			fmt.Printf("ffmpeg read ended after %d frames: %v\n", framesSent, err)
 			break
 		}
-		opus, _ := encoder.Encode(pcm, 960, 960*2*2)
-		vc.OpusSend <- opus
-
-		if !player.Playing { // stop/skip requested
-			break
+		opus, err := encoder.Encode(pcm, 960, 960*2*2)
+		if err != nil {
+			fmt.Println("opus encode error:", err)
+			continue
+		}
+		select {
+		case vc.OpusSend <- opus:
+			framesSent++
+			if framesSent%500 == 0 {
+				fmt.Printf("Sent %d opus frames so far\n", framesSent)
+			}
+		case <-time.After(200 * time.Millisecond):
+			fmt.Printf("opus send timeout at frame %d\n", framesSent)
 		}
 	}
 
@@ -406,11 +445,16 @@ func PlayMusic(player *VoicePlayer, song Song, discord *discordgo.Session, messa
 
 	if player.AutoAdvance && len(player.Queue) > 0 {
 		next := player.Queue[0]
+		// player.CurrentSong = player.Queue[0]
 		player.Queue = player.Queue[1:]
 		go PlayMusic(player, next, discord, message)
 	} else if !player.AutoAdvance {
 		// skip/stop handled the next step explicitly
 	} else {
+		discord.UpdateStatusComplex(discordgo.UpdateStatusData{
+			Status:     "online",
+			Activities: []*discordgo.Activity{},
+		})
 		discord.ChannelMessageSend(message.ChannelID, "Queue finished.")
 	}
 }
