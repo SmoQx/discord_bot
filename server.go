@@ -325,8 +325,11 @@ func RunServer(db *sql.DB) {
 
 			if players[YOUR_SERVER_ID] != nil {
 				players[YOUR_SERVER_ID].PlayMusicFromWeb(currentSongMockup)
+				crud.InsertSongIntoDatabase(currentSongMockup.Filename, currentSongMockup.Title, YOUR_SERVER_ID, db)
+				crud.UpdateSongsPlayCount(currentSongMockup.Filename, YOUR_SERVER_ID, db)
 			} else {
 				ctx.JSON(http.StatusBadRequest, gin.H{"error": "there is no active player"})
+				return
 			}
 
 			ctx.JSON(http.StatusOK, gin.H{"message": "ok"})
@@ -363,6 +366,7 @@ func RunServer(db *sql.DB) {
 			}
 			if players[YOUR_SERVER_ID] == nil {
 				ctx.JSON(http.StatusBadRequest, gin.H{"error": "there is no active player"})
+				return
 			}
 			queue := players[YOUR_SERVER_ID].Queue
 			// queue := queueMoqup
@@ -392,6 +396,7 @@ func RunServer(db *sql.DB) {
 
 			if players[YOUR_SERVER_ID] == nil {
 				ctx.JSON(http.StatusBadRequest, gin.H{"error": "there is no active player"})
+				return
 			}
 
 			players[YOUR_SERVER_ID].Queue = append(players[YOUR_SERVER_ID].Queue, Song{Filename: body.SongId, Title: body.SongName})
@@ -421,6 +426,7 @@ func RunServer(db *sql.DB) {
 
 			if players[YOUR_SERVER_ID] == nil {
 				ctx.JSON(http.StatusBadRequest, gin.H{"error": "there is no active player"})
+				return
 			}
 
 			players[YOUR_SERVER_ID].Queue = newQueue
@@ -437,6 +443,7 @@ func RunServer(db *sql.DB) {
 
 			if players[YOUR_SERVER_ID] == nil {
 				ctx.JSON(http.StatusBadRequest, gin.H{"error": "there is no active player"})
+				return
 			}
 
 			currentSong := players[YOUR_SERVER_ID].CurrentSong
