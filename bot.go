@@ -68,6 +68,12 @@ func Run(token string, db *sql.DB) {
 	discord, err := discordgo.New("Bot " + token)
 	checkNilErr(err)
 
+	discordSession = &discordgo.Session{}
+	discordMessage = &discordgo.MessageCreate{}
+
+	fmt.Println("init discord session and message")
+	fmt.Println(discordSession, discordMessage)
+
 	// discord.AddHandler(func(s *discordgo.Session, m *discordgo.MessageCreate) {
 	// 	newMessage(s, m, db) // pass db yourself
 	// })
@@ -146,9 +152,6 @@ func Run(token string, db *sql.DB) {
 			fmt.Println("Cannot create '%v' command: %v", cmd.Name, err)
 		}
 	}
-
-	discordSession = &discordgo.Session{}
-	discordMessage = &discordgo.MessageCreate{}
 
 	fmt.Println("Bot started")
 	c := make(chan os.Signal, 1)
@@ -368,7 +371,14 @@ func PlayMusicFromInteraction(player *VoicePlayer, song Song, discord *discordgo
 
 func (v *VoicePlayer) PlayMusicFromWeb(song Song) {
 
-	PlayMusic(v, song, discordSession, discordMessage)
+	if v.Playing {
+		SkipMusic(v.VC, discordSession, discordMessage)
+	}
+	PlayMusic(v, song, discordSession, nil)
+}
+
+func (v *VoicePlayer) SkipMusicFromWeb() {
+	SkipMusic(v.VC, discordSession, nil)
 }
 
 func PlayMusic(player *VoicePlayer, song Song, discord *discordgo.Session, message *discordgo.MessageCreate) {
@@ -382,7 +392,7 @@ func PlayMusic(player *VoicePlayer, song Song, discord *discordgo.Session, messa
 		fmt.Println("error the voice client isnt ready")
 	}
 
-	discord.ChannelMessageSend(message.ChannelID, "Now playing: **"+song.Title+"**")
+	// discord.ChannelMessageSend(message.ChannelID, "Now playing: **"+song.Title+"**")
 
 	player.CurrentSong = song
 
@@ -992,6 +1002,24 @@ func newCommand(discord *discordgo.Session, i *discordgo.InteractionCreate, db *
 				},
 			})
 			JoinServerFromCommand(discord, i)
+
+			vs, err := findUserVoiceState(discord, i.GuildID, i.Member.User.ID)
+
+			if err != nil {
+				discord.FollowupMessageCreate(i.Interaction, false, &discordgo.WebhookParams{
+					Content: "Something went wrong i cannot find you",
+				})
+			}
+
+			player, ok := players[vs.GuildID]
+			if !ok {
+				player = &VoicePlayer{
+					VC:          voiceConnections[vs.GuildID],
+					Queue:       []Song{},
+					AutoAdvance: true,
+				}
+				players[vs.GuildID] = player
+			}
 		case "playlista":
 			crud.InitDatabase(db)
 			discord.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
@@ -1174,14 +1202,16 @@ func newCommand(discord *discordgo.Session, i *discordgo.InteractionCreate, db *
 					}
 				}
 			}
-			crud.InsertSongIntoDatabase(song.Filename, song.Title, i.GuildID, db)
-			crud.UpdateSongsPlayCount(song.Filename, i.GuildID, db)
+
 			if err != nil {
 				discord.FollowupMessageCreate(i.Interaction, false, &discordgo.WebhookParams{
 					Content: "Failed to download: " + err.Error(),
 				})
 				return
 			}
+
+			crud.InsertSongIntoDatabase(song.Filename, song.Title, i.GuildID, db)
+			crud.UpdateSongsPlayCount(song.Filename, i.GuildID, db)
 
 			player, ok := players[vs.GuildID]
 			if !ok {

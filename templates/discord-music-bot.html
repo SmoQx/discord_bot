@@ -2206,32 +2206,43 @@
         }
 
         async function nextSong() {
+            // if (queue.length) {
+            //     const next = queue.shift(); // removes first item from local queue
+            //     renderQueue();
+            //
+            //     // sync the removal to the server
+            //     try {
+            //         queueDirty = true;
+            //         await apiFetch('/api/queue/update', {
+            //             method: 'POST',
+            //             body: JSON.stringify(queue.map(q => ({id: q.id, title: q.title})))
+            //         });
+            //     } catch (err) {
+            //         pushMsg('SYSTEM', `Failed to sync queue: ${err.message}`, 'system');
+            //     } finally {
+            //         queueDirty = false;
+            //     }
+            //
+            //     playSong(next.id); // ← pass just the id
+            //     return;
+            // }
+            //
+            // const idx = songs.findIndex(s => s.id === currentSongId);
+            // const newIdx = isShuffle
+            //     ? Math.floor(Math.random() * songs.length)
+            //     : (idx + 1) % songs.length;
+            // playSong(songs[newIdx].id);
             if (queue.length) {
-                const next = queue.shift(); // removes first item from local queue
-                renderQueue();
-
-                // sync the removal to the server
                 try {
                     queueDirty = true;
-                    await apiFetch('/api/queue/update', {
-                        method: 'POST',
-                        body: JSON.stringify(queue.map(q => ({id: q.id, title: q.title})))
-                    });
+                    const res = await apiFetch('/api/nextSong');
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 } catch (err) {
                     pushMsg('SYSTEM', `Failed to sync queue: ${err.message}`, 'system');
                 } finally {
                     queueDirty = false;
                 }
-
-                playSong(next.id); // ← pass just the id
-                return;
             }
-
-            const idx = songs.findIndex(s => s.id === currentSongId);
-            const newIdx = isShuffle
-                ? Math.floor(Math.random() * songs.length)
-                : (idx + 1) % songs.length;
-            playSong(songs[newIdx].id);
         }
 
         function toggleShuffle() {

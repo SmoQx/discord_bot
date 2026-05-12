@@ -466,6 +466,7 @@ func RunServer(db *sql.DB) {
 		})
 
 		api.GET("/nextSong", func(ctx *gin.Context) {
+			players[YOUR_SERVER_ID].SkipMusicFromWeb()
 			ctx.JSON(http.StatusOK, gin.H{"message": "skipping"})
 		})
 
