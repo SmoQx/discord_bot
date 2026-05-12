@@ -281,6 +281,8 @@ func RunServer(db *sql.DB) {
 		c.Next()
 	})
 
+	router.SetTrustedProxies([]string{"127.0.0.1"})
+
 	// router.Static("/static", "./static")
 
 	// cookie session store
