@@ -2160,17 +2160,19 @@
         }
 
         async function playSong(id) {
+            console.log(id);
             if (currentSongId === id) {togglePlay(); return;}
             currentSongId = id;
             progress = 0;
             isPlaying = true;
-            song = getSong(id);
+            song = getSong(id + ".mp3");
+            console.log("song id:", song.id, "song titiel", song.title);
             try {
                 const res2 = await fetch(`${API}/api/playThis`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
-                        SongId: song.filename,
+                        SongId: song.id,
                         SongName: song.title
                     })
                 });
@@ -2182,9 +2184,9 @@
             updatePlayBtn();
             startProgress();
             // Increment counter in real app
-            songs.find(s => s.id === id).played_counter++;
+            // songs.find(s => s.id === id).played_counter++;
             renderTopSongs();
-            toast(`Playing "${getSong(id).title}"`, 'success');
+            // toast(`Playing "${getSong(id).title}"`, 'success');
         }
 
         function togglePlay() {
@@ -2205,8 +2207,28 @@
             playSong(songs[newIdx].id);
         }
 
-        function nextSong() {
-            if (queue.length) {playSong(queue.shift()); renderQueue(); return;}
+        async function nextSong() {
+            if (queue.length) {
+                const next = queue.shift(); // removes first item from local queue
+                renderQueue();
+
+                // sync the removal to the server
+                try {
+                    queueDirty = true;
+                    await apiFetch('/api/queue/update', {
+                        method: 'POST',
+                        body: JSON.stringify(queue.map(q => ({id: q.id, title: q.title})))
+                    });
+                } catch (err) {
+                    pushMsg('SYSTEM', `Failed to sync queue: ${err.message}`, 'system');
+                } finally {
+                    queueDirty = false;
+                }
+
+                playSong(next.id); // ← pass just the id
+                return;
+            }
+
             const idx = songs.findIndex(s => s.id === currentSongId);
             const newIdx = isShuffle
                 ? Math.floor(Math.random() * songs.length)

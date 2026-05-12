@@ -26,10 +26,12 @@ type Secret struct {
 var secret Secret
 
 var queueMoqup []Song = []Song{
-	{Filename: "1.mp3", Title: "asdf"},
-	{Filename: "2.mp3", Title: "test"},
-	{Filename: "3.mp3", Title: "test2"},
+	{Filename: "h4F-zhMz4PQ.mp3", Title: "asdf"},
+	{Filename: "LMGAkdA41f8.mp3", Title: "test"},
+	{Filename: "qrxv0JNVtgY.mp3", Title: "test2"},
 }
+
+var currentSongMockup Song = Song{}
 
 func getOAuthConfig(r *http.Request) *oauth2.Config {
 
@@ -319,9 +321,9 @@ func RunServer(db *sql.DB) {
 				ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 				return
 			}
-			ctx.JSON(http.StatusOK, gin.H{
-				"message": "ok",
-			})
+			currentSongMockup = Song{Title: body.SongName, Filename: body.SongId}
+
+			ctx.JSON(http.StatusOK, gin.H{"message": "ok"})
 		})
 
 		api.GET("/searchYT", func(ctx *gin.Context) {
@@ -354,8 +356,8 @@ func RunServer(db *sql.DB) {
 				Server string `json:"server"`
 			}
 
-			queue := players[YOUR_SERVER_ID].Queue
-			// queue := queueMoqup
+			// queue := players[YOUR_SERVER_ID].Queue
+			queue := queueMoqup
 			items := make([]QueueItem, len(queue))
 			for i, song := range queue {
 				items[i] = QueueItem{
@@ -380,8 +382,8 @@ func RunServer(db *sql.DB) {
 			}
 			// fmt.Println(players[YOUR_SERVER_ID].Queue)
 
-			players[YOUR_SERVER_ID].Queue = append(players[YOUR_SERVER_ID].Queue, Song{Filename: body.SongId, Title: body.SongName})
-			// queueMoqup = append(queueMoqup, Song{Filename: body.SongId, Title: body.SongName})
+			// players[YOUR_SERVER_ID].Queue = append(players[YOUR_SERVER_ID].Queue, Song{Filename: body.SongId, Title: body.SongName})
+			queueMoqup = append(queueMoqup, Song{Filename: body.SongId, Title: body.SongName})
 		})
 
 		api.POST("/queue/update", func(ctx *gin.Context) {
@@ -405,8 +407,8 @@ func RunServer(db *sql.DB) {
 				}
 			}
 
-			players[YOUR_SERVER_ID].Queue = newQueue
-			// queueMoqup = newQueue
+			// players[YOUR_SERVER_ID].Queue = newQueue
+			queueMoqup = newQueue
 			ctx.JSON(http.StatusOK, gin.H{"updated": len(newQueue)})
 		})
 
@@ -424,10 +426,11 @@ func RunServer(db *sql.DB) {
 			// 	Server: YOUR_SERVER_ID,
 			// }
 			item := NowPlayingItem{
-				Id:     "1",
-				Title:  "asdf",
+				Id:     strings.TrimSuffix(currentSongMockup.Filename, ".mp3"),
+				Title:  currentSongMockup.Title,
 				Server: YOUR_SERVER_ID,
 			}
+			fmt.Println(currentSongMockup)
 			ctx.JSON(http.StatusOK, gin.H{"CurrentSong": item})
 		})
 
