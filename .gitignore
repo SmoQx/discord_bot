@@ -1,2 +1,7 @@
 *.mp3
 *.mp4
+__pycache__
+venv
+.mozilla
+yt-dlp-master
+.idea
