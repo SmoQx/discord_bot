@@ -68,7 +68,7 @@ func Run(token string, db *sql.DB) {
 	discord, err := discordgo.New("Bot " + token)
 	checkNilErr(err)
 
-	discordSession = &discordgo.Session{}
+	discordSession = discord
 	discordMessage = &discordgo.MessageCreate{}
 
 	fmt.Println("init discord session and message")
@@ -370,15 +370,18 @@ func PlayMusicFromInteraction(player *VoicePlayer, song Song, discord *discordgo
 }
 
 func (v *VoicePlayer) PlayMusicFromWeb(song Song) {
-
 	if v.Playing {
 		SkipMusic(v.VC, discordSession, discordMessage)
 	}
 	PlayMusic(v, song, discordSession, nil)
 }
 
-func (v *VoicePlayer) SkipMusicFromWeb() {
-	SkipMusic(v.VC, discordSession, nil)
+func (v *VoicePlayer) SkipMusicFromWeb(song Song) {
+	if !v.Playing {
+		PlayMusic(v, song, discordSession, nil)
+	} else {
+		SkipMusic(v.VC, discordSession, discordMessage)
+	}
 }
 
 func PlayMusic(player *VoicePlayer, song Song, discord *discordgo.Session, message *discordgo.MessageCreate) {
@@ -623,7 +626,8 @@ func SkipMusicForInteraction(vc *discordgo.VoiceConnection, discord *discordgo.S
 func SkipMusic(vc *discordgo.VoiceConnection, discord *discordgo.Session, message *discordgo.MessageCreate) {
 	player, ok := players[vc.GuildID]
 	if !ok || !player.Playing {
-		discord.ChannelMessageSend(message.ChannelID, "No music is currently playing.")
+		// discord.ChannelMessageSend(message.ChannelID, "No music is currently playing.")
+		fmt.Println("No music is currently playing.")
 		return
 	}
 
@@ -639,10 +643,12 @@ func SkipMusic(vc *discordgo.VoiceConnection, discord *discordgo.Session, messag
 	if len(player.Queue) > 0 {
 		next := player.Queue[0]
 		player.Queue = player.Queue[1:]
-		discord.ChannelMessageSend(message.ChannelID, "Skipping… Now playing: **"+next.Title+"**")
+		// discord.ChannelMessageSend(message.ChannelID, "Skipping… Now playing: **"+next.Title+"**")
+		fmt.Println("Skipping… Now playing: **" + next.Title + "**")
 		go PlayMusic(player, next, discord, message) // this new PlayMusic will reset AutoAdvance=true
 	} else {
-		discord.ChannelMessageSend(message.ChannelID, "Skipped. No more songs in the queue.")
+		// discord.ChannelMessageSend(message.ChannelID, "Skipped. No more songs in the queue.")
+		fmt.Println("Skipped. No more songs in the queue.")
 	}
 }
 

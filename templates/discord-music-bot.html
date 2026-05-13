@@ -2235,12 +2235,21 @@
             if (queue.length) {
                 try {
                     queueDirty = true;
-                    const res = await apiFetch('/api/nextSong');
+                    next = queue.shift();
+                    const res = await fetch(`${API}/api/playThis`, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            SongId: next.id,
+                            SongName: next.title
+                        })
+                    });
                     if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 } catch (err) {
                     pushMsg('SYSTEM', `Failed to sync queue: ${err.message}`, 'system');
                 } finally {
                     queueDirty = false;
+                    renderQueue()
                 }
             }
         }
