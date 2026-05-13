@@ -465,8 +465,20 @@ func RunServer(db *sql.DB) {
 			ctx.JSON(http.StatusOK, gin.H{"CurrentSong": item})
 		})
 
-		api.GET("/nextSong", func(ctx *gin.Context) {
-			players[YOUR_SERVER_ID].SkipMusicFromWeb()
+		api.POST("/nextSong", func(ctx *gin.Context) {
+			var body struct {
+				SongId   string `json:"SongId"`
+				SongName string `json:"SongName"`
+			}
+
+			if err := ctx.ShouldBindJSON(&body); err != nil {
+				ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+
+			nextSong := Song{Title: body.SongName, Filename: body.SongId}
+
+			players[YOUR_SERVER_ID].SkipMusicFromWeb(nextSong)
 			ctx.JSON(http.StatusOK, gin.H{"message": "skipping"})
 		})
 

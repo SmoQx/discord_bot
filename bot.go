@@ -274,9 +274,9 @@ func LeaveServerForInteraction(discord *discordgo.Session, i *discordgo.Interact
 }
 
 func PlayMusicFromInteraction(player *VoicePlayer, song Song, discord *discordgo.Session, i *discordgo.InteractionCreate) {
-	// Start a fresh playback: allow auto-advance unless a skip/stop disables it
 	player.Playing = true
 	player.AutoAdvance = true
+	player.CurrentSong = song
 	fmt.Println("play")
 
 	vc := player.VC
@@ -287,8 +287,6 @@ func PlayMusicFromInteraction(player *VoicePlayer, song Song, discord *discordgo
 	discord.FollowupMessageCreate(i.Interaction, false, &discordgo.WebhookParams{
 		Content: "Now playing: **" + song.Title + "**",
 	})
-
-	player.CurrentSong = song
 
 	vc.Speaking(true)
 	ffmpeg := exec.Command("ffmpeg", "-i", "./cache/"+song.Filename, "-f", "s16le", "-ar", "48000", "-ac", "2", "pipe:1")
@@ -313,17 +311,14 @@ func PlayMusicFromInteraction(player *VoicePlayer, song Song, discord *discordgo
 	discord.UpdateStatusComplex(discordgo.UpdateStatusData{
 		Status: "online",
 		Activities: []*discordgo.Activity{
-			{
-				Name: song.Title,
-				Type: discordgo.ActivityTypeListening,
-			},
+			{Name: song.Title, Type: discordgo.ActivityTypeListening},
 		},
 	})
 
 	encoder, _ := gopus.NewEncoder(48000, 2, gopus.Audio)
-	pcm := make([]int16, 960*2) // 20ms stereo
-
+	pcm := make([]int16, 960*2)
 	framesSent := 0
+
 	for {
 		if err := binary.Read(ffmpegOut, binary.LittleEndian, pcm); err != nil {
 			fmt.Printf("ffmpeg read ended after %d frames: %v\n", framesSent, err)
@@ -343,9 +338,11 @@ func PlayMusicFromInteraction(player *VoicePlayer, song Song, discord *discordgo
 		case <-time.After(200 * time.Millisecond):
 			fmt.Printf("opus send timeout at frame %d\n", framesSent)
 		}
+		if !player.Playing {
+			break
+		}
 	}
 
-	// Tear down this playback
 	_ = ffmpeg.Wait()
 	vc.Speaking(false)
 	player.FFmpegCmd = nil
@@ -353,12 +350,9 @@ func PlayMusicFromInteraction(player *VoicePlayer, song Song, discord *discordgo
 
 	if player.AutoAdvance && len(player.Queue) > 0 {
 		next := player.Queue[0]
-		// player.CurrentSong = player.Queue[0]
 		player.Queue = player.Queue[1:]
 		go PlayMusicFromInteraction(player, next, discord, i)
-	} else if !player.AutoAdvance {
-		// skip/stop handled the next step explicitly
-	} else {
+	} else if player.AutoAdvance {
 		discord.UpdateStatusComplex(discordgo.UpdateStatusData{
 			Status:     "online",
 			Activities: []*discordgo.Activity{},
@@ -371,23 +365,37 @@ func PlayMusicFromInteraction(player *VoicePlayer, song Song, discord *discordgo
 
 func (v *VoicePlayer) PlayMusicFromWeb(song Song) {
 	if v.Playing {
-		SkipMusic(v.VC, discordSession, discordMessage)
+		// stop current playback cleanly
+		v.AutoAdvance = false
+		v.Playing = false
+		if v.FFmpegCmd != nil {
+			v.FFmpegCmd.Process.Kill()
+			v.FFmpegCmd = nil
+		}
+		time.Sleep(100 * time.Millisecond)
 	}
-	PlayMusic(v, song, discordSession, nil)
+	go PlayMusic(v, song, discordSession, nil)
 }
 
 func (v *VoicePlayer) SkipMusicFromWeb(song Song) {
 	if !v.Playing {
-		PlayMusic(v, song, discordSession, nil)
+		go PlayMusic(v, song, discordSession, nil)
 	} else {
-		SkipMusic(v.VC, discordSession, discordMessage)
+		v.AutoAdvance = false
+		v.Playing = false
+		if v.FFmpegCmd != nil {
+			v.FFmpegCmd.Process.Kill()
+			v.FFmpegCmd = nil
+		}
+		time.Sleep(50 * time.Millisecond)
+		go PlayMusic(v, song, discordSession, nil)
 	}
 }
 
 func PlayMusic(player *VoicePlayer, song Song, discord *discordgo.Session, message *discordgo.MessageCreate) {
-	// Start a fresh playback: allow auto-advance unless a skip/stop disables it
 	player.Playing = true
 	player.AutoAdvance = true
+	player.CurrentSong = song
 	fmt.Println("play")
 
 	vc := player.VC
@@ -395,9 +403,10 @@ func PlayMusic(player *VoicePlayer, song Song, discord *discordgo.Session, messa
 		fmt.Println("error the voice client isnt ready")
 	}
 
-	// discord.ChannelMessageSend(message.ChannelID, "Now playing: **"+song.Title+"**")
-
-	player.CurrentSong = song
+	// only send Discord message if we have a channel context
+	if message != nil {
+		discord.ChannelMessageSend(message.ChannelID, "Now playing: **"+song.Title+"**")
+	}
 
 	vc.Speaking(true)
 	ffmpeg := exec.Command("ffmpeg", "-i", "./cache/"+song.Filename, "-f", "s16le", "-ar", "48000", "-ac", "2", "pipe:1")
@@ -406,29 +415,30 @@ func PlayMusic(player *VoicePlayer, song Song, discord *discordgo.Session, messa
 	ffmpegOut, err := ffmpeg.StdoutPipe()
 	if err != nil {
 		fmt.Println("ffmpeg StdoutPipe error:", err)
-		discord.ChannelMessageSend(message.ChannelID, "Error starting audio pipeline.")
+		if message != nil {
+			discord.ChannelMessageSend(message.ChannelID, "Error starting audio pipeline.")
+		}
 		return
 	}
 	if err := ffmpeg.Start(); err != nil {
 		fmt.Println("Error starting ffmpeg:", err)
-		discord.ChannelMessageSend(message.ChannelID, "Error starting ffmpeg.")
+		if message != nil {
+			discord.ChannelMessageSend(message.ChannelID, "Error starting ffmpeg.")
+		}
 		return
 	}
 
 	discord.UpdateStatusComplex(discordgo.UpdateStatusData{
 		Status: "online",
 		Activities: []*discordgo.Activity{
-			{
-				Name: song.Title,
-				Type: discordgo.ActivityTypeListening,
-			},
+			{Name: song.Title, Type: discordgo.ActivityTypeListening},
 		},
 	})
 
 	encoder, _ := gopus.NewEncoder(48000, 2, gopus.Audio)
-	pcm := make([]int16, 960*2) // 20ms stereo
-
+	pcm := make([]int16, 960*2)
 	framesSent := 0
+
 	for {
 		if err := binary.Read(ffmpegOut, binary.LittleEndian, pcm); err != nil {
 			fmt.Printf("ffmpeg read ended after %d frames: %v\n", framesSent, err)
@@ -448,9 +458,11 @@ func PlayMusic(player *VoicePlayer, song Song, discord *discordgo.Session, messa
 		case <-time.After(200 * time.Millisecond):
 			fmt.Printf("opus send timeout at frame %d\n", framesSent)
 		}
+		if !player.Playing {
+			break
+		}
 	}
 
-	// Tear down this playback
 	_ = ffmpeg.Wait()
 	vc.Speaking(false)
 	player.FFmpegCmd = nil
@@ -458,17 +470,16 @@ func PlayMusic(player *VoicePlayer, song Song, discord *discordgo.Session, messa
 
 	if player.AutoAdvance && len(player.Queue) > 0 {
 		next := player.Queue[0]
-		// player.CurrentSong = player.Queue[0]
 		player.Queue = player.Queue[1:]
 		go PlayMusic(player, next, discord, message)
-	} else if !player.AutoAdvance {
-		// skip/stop handled the next step explicitly
-	} else {
+	} else if player.AutoAdvance {
 		discord.UpdateStatusComplex(discordgo.UpdateStatusData{
 			Status:     "online",
 			Activities: []*discordgo.Activity{},
 		})
-		discord.ChannelMessageSend(message.ChannelID, "Queue finished.")
+		if message != nil {
+			discord.ChannelMessageSend(message.ChannelID, "Queue finished.")
+		}
 	}
 }
 
