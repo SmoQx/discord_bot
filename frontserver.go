@@ -84,7 +84,7 @@ func proxyWithMethod(ctx *gin.Context, method, url string, payload any) {
 }
 
 func RunFrontServer() {
-	cfg, err := loadConfig("config.json")
+	cfg, err := loadConfig("conf.json")
 	if err != nil {
 		panic(err)
 	}
