@@ -3,10 +3,16 @@ package main
 import (
 	"database/sql"
 	"discord_bot/crud"
+	"flag"
 	"fmt"
 )
 
 func main() {
+	runFlag := flag.Bool("bot", false, "Use this flag if you want bot only")
+	runFlag2 := flag.Bool("server", false, "Use this if you want only the server for frontend")
+
+	flag.Parse()
+
 	db, err := sql.Open("sqlite3", "./database/data.db")
 	if err != nil {
 		fmt.Println(err)
@@ -16,7 +22,13 @@ func main() {
 	crud.InitDatabase(db)
 	// crud.Test()
 
-	go RunServer(db)
+	if *runFlag {
+		go RunServer(db)
 
-	MainBOT(db)
+		go MainBOT(db)
+	}
+
+	if *runFlag2 {
+		RunFrontServer(db)
+	}
 }
