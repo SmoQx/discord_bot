@@ -29,6 +29,6 @@ func main() {
 	}
 
 	if *runFlag2 {
-		RunFrontServer(db)
+		RunFrontServer()
 	}
 }
