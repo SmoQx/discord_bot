@@ -43,6 +43,7 @@ func RunFrontServer(db *sql.DB) {
 	router.GET("/auth/logout", handleLogout)
 
 	// protected API routes
+	router.Use(authMiddleware())
 
 	router.LoadHTMLGlob("templates/*")
 
