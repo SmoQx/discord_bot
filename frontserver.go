@@ -1,10 +1,12 @@
 package main
 
 import (
-	"database/sql"
-	"discord_bot/crud"
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/gin-contrib/sessions"
@@ -12,7 +14,82 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func RunFrontServer(db *sql.DB) {
+// Config ładowany z pliku JSON
+type ConfigSrv struct {
+	APIBaseURL string `json:"api_base_url"`
+}
+
+func loadConfig(path string) (*ConfigSrv, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("nie można odczytać pliku konfiguracyjnego: %w", err)
+	}
+	var cfg ConfigSrv
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return nil, fmt.Errorf("błąd parsowania JSON: %w", err)
+	}
+	return &cfg, nil
+}
+
+// Pomocnicze funkcje do proxowania requestów
+
+func proxyGET(ctx *gin.Context, url string) {
+	resp, err := http.Get(url)
+	if err != nil {
+		ctx.JSON(http.StatusBadGateway, gin.H{"error": "błąd połączenia z API: " + err.Error()})
+		return
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	ctx.Data(resp.StatusCode, resp.Header.Get("Content-Type"), body)
+}
+
+func proxyPOST(ctx *gin.Context, url string, payload any) {
+	proxyWithMethod(ctx, http.MethodPost, url, payload)
+}
+
+func proxyPATCH(ctx *gin.Context, url string, payload any) {
+	proxyWithMethod(ctx, http.MethodPatch, url, payload)
+}
+
+func proxyDELETE(ctx *gin.Context, url string, payload any) {
+	proxyWithMethod(ctx, http.MethodDelete, url, payload)
+}
+
+func proxyWithMethod(ctx *gin.Context, method, url string, payload any) {
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "błąd serializacji: " + err.Error()})
+		return
+	}
+
+	req, err := http.NewRequest(method, url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "błąd tworzenia requestu: " + err.Error()})
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		ctx.JSON(http.StatusBadGateway, gin.H{"error": "błąd połączenia z API: " + err.Error()})
+		return
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	ctx.Data(resp.StatusCode, resp.Header.Get("Content-Type"), body)
+}
+
+func RunFrontServer() {
+	cfg, err := loadConfig("config.json")
+	if err != nil {
+		panic(err)
+	}
+	api := cfg.APIBaseURL // np. "http://localhost:8080"
+
 	router := gin.Default()
 	router.Use(func(c *gin.Context) {
 		c.Header("Access-Control-Allow-Origin", "*")
@@ -27,206 +104,119 @@ func RunFrontServer(db *sql.DB) {
 
 	router.SetTrustedProxies([]string{"127.0.0.1"})
 
-	// router.Static("/static", "./static")
-
-	// cookie session store
 	store := cookie.NewStore([]byte("random_state_string"))
 	store.Options(sessions.Options{
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   false,        // set true in production with HTTPS
-		MaxAge:   60 * 60 * 24, // 1 day
+		Secure:   false,
+		MaxAge:   60 * 60 * 24,
 	})
-
 	router.Use(sessions.Sessions("discord_session", store))
 
-	// auth routes — no middleware
+	// Auth routes — bez middleware
 	router.GET("/auth/login", handleLogin)
 	router.GET("/auth/callback", handleCallback)
 	router.GET("/auth/logout", handleLogout)
 
-	// protected API routes
-	api := router.Group("/api")
-	api.Use(authMiddleware())
+	// Chronione endpointy — proxy do zewnętrznego API
+	apiGroup := router.Group("/api")
+	apiGroup.Use(authMiddleware())
 	{
-		api.GET("/songs", func(ctx *gin.Context) {
-			GetSongs(ctx, db)
+		// GET /api/songs
+		apiGroup.GET("/songs", func(ctx *gin.Context) {
+			proxyGET(ctx, api+"/songs")
 		})
 
-		api.GET("/playlists", func(ctx *gin.Context) {
-			GetPlaylists(ctx, db)
+		// GET /api/playlists
+		apiGroup.GET("/playlists", func(ctx *gin.Context) {
+			proxyGET(ctx, api+"/playlists")
 		})
 
-		api.POST("/playThis", func(ctx *gin.Context) {
+		// POST /api/playThis
+		apiGroup.POST("/playThis", func(ctx *gin.Context) {
 			var body struct {
 				SongId   string `json:"SongId"`
 				SongName string `json:"SongName"`
 			}
-
 			if err := ctx.ShouldBindJSON(&body); err != nil {
 				ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 				return
 			}
-			currentSongMockup = Song{Title: body.SongName, Filename: body.SongId}
-
-			if players[YOUR_SERVER_ID] != nil {
-				players[YOUR_SERVER_ID].PlayMusicFromWeb(currentSongMockup)
-				crud.InsertSongIntoDatabase(currentSongMockup.Filename, currentSongMockup.Title, YOUR_SERVER_ID, db)
-				crud.UpdateSongsPlayCount(currentSongMockup.Filename, YOUR_SERVER_ID, db)
-			} else {
-				ctx.JSON(http.StatusBadRequest, gin.H{"error": "there is no active player"})
-				return
-			}
-
-			ctx.JSON(http.StatusOK, gin.H{"message": "ok"})
+			proxyPOST(ctx, api+"/playThis", body)
 		})
 
-		api.GET("/searchYT", func(ctx *gin.Context) {
+		// GET /api/searchYT?query=...
+		apiGroup.GET("/searchYT", func(ctx *gin.Context) {
 			query := ctx.Query("query")
 			if query == "" {
 				ctx.JSON(http.StatusBadRequest, gin.H{"error": "query is required"})
 				return
 			}
-			// fmt.Println(query)
-			GetVideoID(ctx, query)
+			proxyGET(ctx, api+"/searchYT?query="+query)
 		})
 
-		api.GET("/downloadYT", func(ctx *gin.Context) {
+		// GET /api/downloadYT?query=...
+		apiGroup.GET("/downloadYT", func(ctx *gin.Context) {
 			query := ctx.Query("query")
 			if query == "" {
 				ctx.JSON(http.StatusBadRequest, gin.H{"error": "query is required"})
 				return
 			}
-
 			videoId := strings.Split(query, ".")[0]
-
-			// fmt.Println(videoId)
-			DownloadSelectedVideo(ctx, videoId)
+			proxyGET(ctx, api+"/downloadYT?query="+videoId)
 		})
 
-		api.GET("/queue", func(ctx *gin.Context) {
-			type QueueItem struct {
-				Id     string `json:"id"`
-				Title  string `json:"title"`
-				Server string `json:"server"`
-			}
-			if players[YOUR_SERVER_ID] == nil {
-				ctx.JSON(http.StatusBadRequest, gin.H{"error": "there is no active player"})
-				return
-			}
-			queue := players[YOUR_SERVER_ID].Queue
-			// queue := queueMoqup
-			items := make([]QueueItem, len(queue))
-			for i, song := range queue {
-				items[i] = QueueItem{
-					Id:     strings.TrimSuffix(song.Filename, ".mp3"),
-					Title:  song.Title,
-					Server: YOUR_SERVER_ID,
-				}
-			}
-
-			ctx.JSON(http.StatusOK, items)
+		// GET /api/queue
+		apiGroup.GET("/queue", func(ctx *gin.Context) {
+			proxyGET(ctx, api+"/queue")
 		})
 
-		api.POST("/queue/add", func(ctx *gin.Context) {
+		// POST /api/queue/add
+		apiGroup.POST("/queue/add", func(ctx *gin.Context) {
 			var body struct {
 				SongId   string `json:"SongId"`
 				SongName string `json:"SongName"`
 			}
-
 			if err := ctx.ShouldBindJSON(&body); err != nil {
 				ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 				return
 			}
-			// fmt.Println(players[YOUR_SERVER_ID].Queue)
-
-			if players[YOUR_SERVER_ID] == nil {
-				ctx.JSON(http.StatusBadRequest, gin.H{"error": "there is no active player"})
-				return
-			}
-
-			players[YOUR_SERVER_ID].Queue = append(players[YOUR_SERVER_ID].Queue, Song{Filename: body.SongId, Title: body.SongName})
-			// queueMoqup = append(queueMoqup, Song{Filename: body.SongId, Title: body.SongName})
+			proxyPOST(ctx, api+"/queue/add", body)
 		})
 
-		api.POST("/queue/update", func(ctx *gin.Context) {
-			type QueueItem struct {
+		// POST /api/queue/update
+		apiGroup.POST("/queue/update", func(ctx *gin.Context) {
+			var items []struct {
 				Id    string `json:"id"`
 				Title string `json:"title"`
 			}
-
-			var items []QueueItem
 			if err := ctx.ShouldBindJSON(&items); err != nil {
 				ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 				return
 			}
-
-			// rebuild the queue from the reordered items
-			newQueue := make([]Song, len(items))
-			for i, item := range items {
-				newQueue[i] = Song{
-					Filename: item.Id + ".mp3", // re-append the suffix
-					Title:    item.Title,
-				}
-			}
-
-			if players[YOUR_SERVER_ID] == nil {
-				ctx.JSON(http.StatusBadRequest, gin.H{"error": "there is no active player"})
-				return
-			}
-
-			players[YOUR_SERVER_ID].Queue = newQueue
-			// queueMoqup = newQueue
-			ctx.JSON(http.StatusOK, gin.H{"updated": len(newQueue)})
+			proxyPOST(ctx, api+"/queue/update", items)
 		})
 
-		api.GET("/currentlyPlaying", func(ctx *gin.Context) {
-			type NowPlayingItem struct {
-				Id     string `json:"id"`
-				Title  string `json:"title"`
-				Server string `json:"server"`
-			}
-
-			if players[YOUR_SERVER_ID] == nil {
-				ctx.JSON(http.StatusBadRequest, gin.H{"error": "there is no active player"})
-				return
-			}
-
-			currentSong := players[YOUR_SERVER_ID].CurrentSong
-
-			fmt.Println(currentSong)
-			item := NowPlayingItem{
-				Id:     strings.TrimSuffix(currentSong.Filename, ".mp3"),
-				Title:  currentSong.Title,
-				Server: YOUR_SERVER_ID,
-			}
-			// item := NowPlayingItem{
-			// 	Id:     strings.TrimSuffix(currentSongMockup.Filename, ".mp3"),
-			// 	Title:  currentSongMockup.Title,
-			// 	Server: YOUR_SERVER_ID,
-			// }
-			// fmt.Println(currentSongMockup)
-			ctx.JSON(http.StatusOK, gin.H{"CurrentSong": item})
+		// GET /api/currentlyPlaying
+		apiGroup.GET("/currentlyPlaying", func(ctx *gin.Context) {
+			proxyGET(ctx, api+"/currentlyPlaying")
 		})
 
-		api.POST("/nextSong", func(ctx *gin.Context) {
+		// POST /api/nextSong
+		apiGroup.POST("/nextSong", func(ctx *gin.Context) {
 			var body struct {
 				SongId   string `json:"SongId"`
 				SongName string `json:"SongName"`
 			}
-
 			if err := ctx.ShouldBindJSON(&body); err != nil {
 				ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 				return
 			}
-
-			nextSong := Song{Title: body.SongName, Filename: body.SongId}
-
-			players[YOUR_SERVER_ID].SkipMusicFromWeb(nextSong)
-			ctx.JSON(http.StatusOK, gin.H{"message": "skipping"})
+			proxyPOST(ctx, api+"/nextSong", body)
 		})
 
-		api.PATCH("/updatePlaylistName", func(ctx *gin.Context) {
+		// PATCH /api/updatePlaylistName
+		apiGroup.PATCH("/updatePlaylistName", func(ctx *gin.Context) {
 			var body struct {
 				PlaylistId int    `json:"playlist_id"`
 				NewName    string `json:"title"`
@@ -235,11 +225,11 @@ func RunFrontServer(db *sql.DB) {
 				ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 				return
 			}
-
-			ChangePlaylistName(ctx, db, body.PlaylistId, body.NewName)
+			proxyPATCH(ctx, api+"/updatePlaylistName", body)
 		})
 
-		api.DELETE("/removeSongFromPlaylist", func(ctx *gin.Context) {
+		// DELETE /api/removeSongFromPlaylist
+		apiGroup.DELETE("/removeSongFromPlaylist", func(ctx *gin.Context) {
 			var body struct {
 				PlaylistId int    `json:"playlist_id"`
 				SongId     string `json:"song_id"`
@@ -248,11 +238,11 @@ func RunFrontServer(db *sql.DB) {
 				ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 				return
 			}
-
-			RemoveSongFromPlaylist(ctx, db, body.PlaylistId, body.SongId)
+			proxyDELETE(ctx, api+"/removeSongFromPlaylist", body)
 		})
 
-		api.POST("/addSongToPlaylist", func(ctx *gin.Context) {
+		// POST /api/addSongToPlaylist
+		apiGroup.POST("/addSongToPlaylist", func(ctx *gin.Context) {
 			var body struct {
 				PlaylistId int    `json:"playlist_id"`
 				SongId     string `json:"song_id"`
@@ -261,11 +251,11 @@ func RunFrontServer(db *sql.DB) {
 				ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 				return
 			}
-
-			AddSongToPlaylist(ctx, db, body.PlaylistId, body.SongId)
+			proxyPOST(ctx, api+"/addSongToPlaylist", body)
 		})
 
-		api.POST("/createPlaylist", func(ctx *gin.Context) {
+		// POST /api/createPlaylist
+		apiGroup.POST("/createPlaylist", func(ctx *gin.Context) {
 			var body struct {
 				Title string `json:"title"`
 			}
@@ -273,26 +263,23 @@ func RunFrontServer(db *sql.DB) {
 				ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 				return
 			}
-
-			CreatePlaylist(ctx, db, body.Title)
+			proxyPOST(ctx, api+"/createPlaylist", body)
 		})
 
-		api.DELETE("/removePlaylist", func(ctx *gin.Context) {
+		// DELETE /api/removePlaylist
+		apiGroup.DELETE("/removePlaylist", func(ctx *gin.Context) {
 			var body struct {
 				PlaylistId int `json:"playlist_id"`
 			}
-
 			if err := ctx.ShouldBindJSON(&body); err != nil {
 				ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 				return
 			}
-
-			RemovePlaylist(ctx, db, body.PlaylistId)
+			proxyDELETE(ctx, api+"/removePlaylist", body)
 		})
 	}
 
 	router.LoadHTMLGlob("templates/*")
-
 	router.GET("/", func(ctx *gin.Context) {
 		ctx.HTML(http.StatusOK, "discord-music-bot.html", nil)
 	})
