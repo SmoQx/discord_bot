@@ -302,17 +302,17 @@ func RunServer(db *sql.DB) {
 	router.GET("/auth/logout", handleLogout)
 
 	// protected API routes
-	api := router.Group("/api")
+	// api := router.Group("/api")
 	{
-		api.GET("/songs", func(ctx *gin.Context) {
+		router.GET("/songs", func(ctx *gin.Context) {
 			GetSongs(ctx, db)
 		})
 
-		api.GET("/playlists", func(ctx *gin.Context) {
+		router.GET("/playlists", func(ctx *gin.Context) {
 			GetPlaylists(ctx, db)
 		})
 
-		api.POST("/playThis", func(ctx *gin.Context) {
+		router.POST("/playThis", func(ctx *gin.Context) {
 			var body struct {
 				SongId   string `json:"SongId"`
 				SongName string `json:"SongName"`
@@ -336,7 +336,7 @@ func RunServer(db *sql.DB) {
 			ctx.JSON(http.StatusOK, gin.H{"message": "ok"})
 		})
 
-		api.GET("/searchYT", func(ctx *gin.Context) {
+		router.GET("/searchYT", func(ctx *gin.Context) {
 			query := ctx.Query("query")
 			if query == "" {
 				ctx.JSON(http.StatusBadRequest, gin.H{"error": "query is required"})
@@ -346,7 +346,7 @@ func RunServer(db *sql.DB) {
 			GetVideoID(ctx, query)
 		})
 
-		api.GET("/downloadYT", func(ctx *gin.Context) {
+		router.GET("/downloadYT", func(ctx *gin.Context) {
 			query := ctx.Query("query")
 			if query == "" {
 				ctx.JSON(http.StatusBadRequest, gin.H{"error": "query is required"})
@@ -359,7 +359,7 @@ func RunServer(db *sql.DB) {
 			DownloadSelectedVideo(ctx, videoId)
 		})
 
-		api.GET("/queue", func(ctx *gin.Context) {
+		router.GET("/queue", func(ctx *gin.Context) {
 			type QueueItem struct {
 				Id     string `json:"id"`
 				Title  string `json:"title"`
@@ -383,7 +383,7 @@ func RunServer(db *sql.DB) {
 			ctx.JSON(http.StatusOK, items)
 		})
 
-		api.POST("/queue/add", func(ctx *gin.Context) {
+		router.POST("/queue/add", func(ctx *gin.Context) {
 			var body struct {
 				SongId   string `json:"SongId"`
 				SongName string `json:"SongName"`
@@ -404,7 +404,7 @@ func RunServer(db *sql.DB) {
 			// queueMoqup = append(queueMoqup, Song{Filename: body.SongId, Title: body.SongName})
 		})
 
-		api.POST("/queue/update", func(ctx *gin.Context) {
+		router.POST("/queue/update", func(ctx *gin.Context) {
 			type QueueItem struct {
 				Id    string `json:"id"`
 				Title string `json:"title"`
@@ -435,7 +435,7 @@ func RunServer(db *sql.DB) {
 			ctx.JSON(http.StatusOK, gin.H{"updated": len(newQueue)})
 		})
 
-		api.GET("/currentlyPlaying", func(ctx *gin.Context) {
+		router.GET("/currentlyPlaying", func(ctx *gin.Context) {
 			type NowPlayingItem struct {
 				Id     string `json:"id"`
 				Title  string `json:"title"`
@@ -464,7 +464,7 @@ func RunServer(db *sql.DB) {
 			ctx.JSON(http.StatusOK, gin.H{"CurrentSong": item})
 		})
 
-		api.POST("/nextSong", func(ctx *gin.Context) {
+		router.POST("/nextSong", func(ctx *gin.Context) {
 			var body struct {
 				SongId   string `json:"SongId"`
 				SongName string `json:"SongName"`
@@ -481,7 +481,7 @@ func RunServer(db *sql.DB) {
 			ctx.JSON(http.StatusOK, gin.H{"message": "skipping"})
 		})
 
-		api.PATCH("/updatePlaylistName", func(ctx *gin.Context) {
+		router.PATCH("/updatePlaylistName", func(ctx *gin.Context) {
 			var body struct {
 				PlaylistId int    `json:"playlist_id"`
 				NewName    string `json:"title"`
@@ -494,7 +494,7 @@ func RunServer(db *sql.DB) {
 			ChangePlaylistName(ctx, db, body.PlaylistId, body.NewName)
 		})
 
-		api.DELETE("/removeSongFromPlaylist", func(ctx *gin.Context) {
+		router.DELETE("/removeSongFromPlaylist", func(ctx *gin.Context) {
 			var body struct {
 				PlaylistId int    `json:"playlist_id"`
 				SongId     string `json:"song_id"`
@@ -507,7 +507,7 @@ func RunServer(db *sql.DB) {
 			RemoveSongFromPlaylist(ctx, db, body.PlaylistId, body.SongId)
 		})
 
-		api.POST("/addSongToPlaylist", func(ctx *gin.Context) {
+		router.POST("/addSongToPlaylist", func(ctx *gin.Context) {
 			var body struct {
 				PlaylistId int    `json:"playlist_id"`
 				SongId     string `json:"song_id"`
@@ -520,7 +520,7 @@ func RunServer(db *sql.DB) {
 			AddSongToPlaylist(ctx, db, body.PlaylistId, body.SongId)
 		})
 
-		api.POST("/createPlaylist", func(ctx *gin.Context) {
+		router.POST("/createPlaylist", func(ctx *gin.Context) {
 			var body struct {
 				Title string `json:"title"`
 			}
@@ -532,7 +532,7 @@ func RunServer(db *sql.DB) {
 			CreatePlaylist(ctx, db, body.Title)
 		})
 
-		api.DELETE("/removePlaylist", func(ctx *gin.Context) {
+		router.DELETE("/removePlaylist", func(ctx *gin.Context) {
 			var body struct {
 				PlaylistId int `json:"playlist_id"`
 			}
