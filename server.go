@@ -303,7 +303,6 @@ func RunServer(db *sql.DB) {
 
 	// protected API routes
 	api := router.Group("/api")
-	api.Use(authMiddleware())
 	{
 		api.GET("/songs", func(ctx *gin.Context) {
 			GetSongs(ctx, db)
@@ -549,9 +548,9 @@ func RunServer(db *sql.DB) {
 
 	router.LoadHTMLGlob("templates/*")
 
-	router.GET("/", func(ctx *gin.Context) {
-		ctx.HTML(http.StatusOK, "discord-music-bot.html", nil)
-	})
+	// router.GET("/", func(ctx *gin.Context) {
+	// 	ctx.HTML(http.StatusOK, "discord-music-bot.html", nil)
+	// })
 
-	router.Run(":6969")
+	router.Run(":6970")
 }

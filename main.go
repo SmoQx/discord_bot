@@ -25,7 +25,7 @@ func main() {
 	if *runFlag {
 		go RunServer(db)
 
-		go MainBOT(db)
+		MainBOT(db)
 	}
 
 	if *runFlag2 {

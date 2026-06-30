@@ -84,8 +84,8 @@ func Run(token string, db *sql.DB) {
 		newCommand(s, i, db)
 	})
 
-	discord.LogLevel = discordgo.LogDebug
-	discord.Debug = true
+	// discord.LogLevel = discordgo.LogDebug
+	// discord.Debug = true
 
 	discord.Open()
 
