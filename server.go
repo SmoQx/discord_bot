@@ -268,13 +268,14 @@ func authMiddleware() gin.HandlerFunc {
 }
 
 func RestartServer(ctx *gin.Context) {
-	process, err := os.FindProcess(os.Getegid())
+	process, err := os.FindProcess(os.Getpid())
 	if err != nil {
 		fmt.Println("There was an error while trying to kill the process")
 	}
 
-	// process.Kill()
-	ctx.JSON(http.StatusOK, gin.H{"message": process})
+	ctx.JSON(http.StatusOK, gin.H{"message": "killing process"})
+	process.Kill()
+	fmt.Println(process)
 }
 
 func RunServer(db *sql.DB) {
