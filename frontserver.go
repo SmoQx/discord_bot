@@ -122,6 +122,10 @@ func RunFrontServer() {
 	apiGroup := router.Group("/api")
 	apiGroup.Use(authMiddleware())
 	{
+		apiGroup.GET("/restart", func(ctx *gin.Context) {
+			proxyGET(ctx, api+"/restart")
+		})
+
 		// GET /api/songs
 		apiGroup.GET("/songs", func(ctx *gin.Context) {
 			proxyGET(ctx, api+"/songs")
