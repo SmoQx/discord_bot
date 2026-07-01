@@ -267,6 +267,16 @@ func authMiddleware() gin.HandlerFunc {
 	}
 }
 
+func RestartServer(ctx *gin.Context) {
+	process, err := os.FindProcess(os.Getegid())
+	if err != nil {
+		fmt.Println("There was an error while trying to kill the process")
+	}
+
+	process.Kill()
+	ctx.JSON(http.StatusOK, gin.H{"message": "Restarting"})
+}
+
 func RunServer(db *sql.DB) {
 
 	router := gin.Default()
@@ -304,6 +314,10 @@ func RunServer(db *sql.DB) {
 	// protected API routes
 	// api := router.Group("/api")
 	{
+		router.GET("/restart", func(ctx *gin.Context) {
+			RestartServer(ctx)
+		})
+
 		router.GET("/songs", func(ctx *gin.Context) {
 			GetSongs(ctx, db)
 		})
