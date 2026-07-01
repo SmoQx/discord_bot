@@ -273,8 +273,8 @@ func RestartServer(ctx *gin.Context) {
 		fmt.Println("There was an error while trying to kill the process")
 	}
 
-	process.Kill()
-	ctx.JSON(http.StatusOK, gin.H{"message": "Restarting"})
+	// process.Kill()
+	ctx.JSON(http.StatusOK, gin.H{"message": process})
 }
 
 func RunServer(db *sql.DB) {
