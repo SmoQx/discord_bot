@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 
@@ -156,7 +157,7 @@ func RunFrontServer() {
 				ctx.JSON(http.StatusBadRequest, gin.H{"error": "query is required"})
 				return
 			}
-			proxyGET(ctx, api+"/searchYT?query="+query)
+			proxyGET(ctx, api+"/searchYT?query="+url.QueryEscape(query))
 		})
 
 		// GET /api/downloadYT?query=...
@@ -167,7 +168,7 @@ func RunFrontServer() {
 				return
 			}
 			videoId := strings.Split(query, ".")[0]
-			proxyGET(ctx, api+"/downloadYT?query="+videoId)
+			proxyGET(ctx, api+"/downloadYT?query="+url.QueryEscape(videoId))
 		})
 
 		// GET /api/queue
@@ -288,5 +289,5 @@ func RunFrontServer() {
 		ctx.HTML(http.StatusOK, "discord-music-bot.html", nil)
 	})
 
-	router.Run(":6969")
+	router.Run(":443")
 }

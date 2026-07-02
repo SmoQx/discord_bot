@@ -2160,6 +2160,7 @@
         }
 
         async function playSong(id) {
+            console.log(id)
             if (currentSongId === id) {togglePlay(); return;}
             currentSongId = id;
             progress = 0;
@@ -2699,8 +2700,10 @@
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 const data = await res.json();
                 const newId = 'yt_' + Date.now();
+                console.log("before song play function")
                 songs.push({id: newId, title, server: 'youtube', played_counter: 0, filename: ytsearchResult[idx].filename});
                 playSong(newId);
+                console.log("after playsong function ")
                 document.getElementById('ytResults').innerHTML = '';
                 document.getElementById('ytInput').value = '';
                 pushMsg('ANDRZEJ', `Now playing: "${title}" [YouTube] ▶`, 'bot');
