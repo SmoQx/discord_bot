@@ -2699,9 +2699,9 @@
                 const res = await apiFetch(`/api/downloadYT?query=${encodeURIComponent(ytsearchResult[idx].filename)}`);
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 const data = await res.json();
-                const newId = 'yt_' + Date.now();
+                const newId = ytsearchResult[idx];
                 console.log("before song play function")
-                songs.push({id: newId, title, server: 'youtube', played_counter: 0, filename: ytsearchResult[idx].filename});
+                songs.push({id: newId, title: title, server: 'youtube', played_counter: 0, filename: ytsearchResult[idx].filename});
                 playSong(newId);
                 console.log("after playsong function ")
                 document.getElementById('ytResults').innerHTML = '';
@@ -2743,6 +2743,8 @@
         checkAuth();
         setInterval(syncQueue, 2000);
         setInterval(updateNowPlaying, 2000);
+
+
     </script>
 </body>
 
