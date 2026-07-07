@@ -263,25 +263,27 @@
             animation: marquee 6s linear infinite;
         }
 
+        .song-item:hover .marquee-text {
+            display: inline-block;
+            animation: marquee 6s linear infinite;
+        }
+
         @keyframes marquee {
             0% {
                 transform: translateX(0);
             }
 
-            30% {
+            20% {
                 transform: translateX(0);
             }
 
-            /* chwila przerwy na początku */
-            70% {
-                transform: translateX(-100%);
+            80% {
+                transform: translateX(calc(-100% - 20px));
             }
 
             100% {
-                transform: translateX(-100%);
+                transform: translateX(calc(-100% - 20px));
             }
-
-            /* chwila przerwy na końcu */
         }
 
         .song-item:hover {
@@ -381,9 +383,9 @@
             font-size: 12px;
             color: var(--text);
             white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            margin-bottom: 3px;
+            < !-- overflow: hidden;
+            -->< !-- text-overflow: ellipsis;
+            -->margin-bottom: 3px;
         }
 
         .song-item.playing .song-title {
@@ -1983,7 +1985,9 @@
       <span class="song-num">${i + 1}</span>
       <div class="song-thumb">${getEmoji(s.id)}</div>
       <div class="song-info">
-        <div class="song-title">${s.title}</div>
+        <div class="song-title">
+            <span class="marquee-text">${s.title}</span>
+        </div>
         <div class="song-meta">#${s.server} · ${fmtTime(getDuration(s.id))}</div>
       </div>
       <div class="song-actions">
