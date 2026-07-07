@@ -263,9 +263,15 @@
             animation: marquee 6s linear infinite;
         }
 
+        .marquee-text {
+            display: inline-block;
+            animation: none;
+        }
+
         .song-item:hover .marquee-text {
             display: inline-block;
-            animation: marquee 6s linear infinite;
+            animation: marquee 10s ease-in-out infinite;
+            /* 10s zamiast 6s */
         }
 
         @keyframes marquee {
@@ -273,22 +279,30 @@
                 transform: translateX(0);
             }
 
-            30% {
+            15% {
                 transform: translateX(0);
             }
 
-            /* chwila przerwy na początku */
-            70% {
-                transform: translateX(-100%);
+            /* pauza na początku */
+            65% {
+                transform: translateX(calc(-100% - 20px));
             }
 
+            /* przewinięcie */
+            80% {
+                transform: translateX(calc(-100% - 20px));
+            }
+
+            /* pauza na końcu */
+            95% {
+                transform: translateX(0);
+            }
+
+            /* powrót */
             100% {
-                transform: translateX(-100%);
+                transform: translateX(0);
             }
-
-            /* chwila przerwy na końcu */
         }
-
 
         .song-item:hover {
             background: rgba(0, 245, 212, 0.04);
