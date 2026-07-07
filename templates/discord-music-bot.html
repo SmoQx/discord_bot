@@ -252,6 +252,38 @@
             border-left: 3px solid transparent;
         }
 
+        .song-item:hover .song-info {
+            overflow: hidden;
+        }
+
+        .song-item:hover .song-title {
+            overflow: hidden;
+            text-overflow: clip;
+            white-space: nowrap;
+            animation: marquee 6s linear infinite;
+        }
+
+        @keyframes marquee {
+            0% {
+                transform: translateX(0);
+            }
+
+            30% {
+                transform: translateX(0);
+            }
+
+            /* chwila przerwy na początku */
+            70% {
+                transform: translateX(-100%);
+            }
+
+            100% {
+                transform: translateX(-100%);
+            }
+
+            /* chwila przerwy na końcu */
+        }
+
         .song-item:hover {
             background: rgba(0, 245, 212, 0.04);
             border-left-color: var(--cyan2);
@@ -271,6 +303,13 @@
 
         .song-item.playing .song-num {
             display: none;
+        }
+
+        .song-info {
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+            /* ← dodaj to */
         }
 
         .playing-bars {
